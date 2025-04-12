@@ -10,49 +10,129 @@ def todoist_create_task(
     ctx: Context,
     content: str,
     description: Optional[str] = None,
+    project_id: Optional[str] = None,
+    section_id: Optional[str] = None,
+    parent_id: Optional[str] = None,
+    order: Optional[int] = None,
+    labels: Optional[list[str]] = None,
+    priority: Optional[int] = None,
     due_string: Optional[str] = None,
-    priority: Optional[int] = None
+    due_date: Optional[str] = None,
+    due_datetime: Optional[str] = None,
+    due_lang: Optional[str] = None,
+    assignee_id: Optional[str] = None,
+    duration: Optional[int] = None,
+    duration_unit: Optional[str] = None,
+    deadline_date: Optional[str] = None,
+    deadline_lang: Optional[str] = None
 ) -> str:
     """Create a new task in Todoist with optional description, due date, and priority
 
     Args:
         content: The content/title of the task
         description: Detailed description of the task (optional)
-        due_string: Natural language due date like 'tomorrow', 'next Monday', 'Jan 23' (optional)
+        project_id: Task project ID. If not set, task is put to user's Inbox (optional)
+        section_id: ID of section to put task into (optional)
+        parent_id: Parent task ID (optional)
+        order: Non-zero integer value used to sort tasks under the same parent (optional)
+        labels: The task's labels (a list of names that may represent either personal or shared labels) (optional)
         priority: Task priority from 1 (normal) to 4 (urgent) (optional)
+        due_string: Natural language due date like 'tomorrow', 'next Monday', 'Jan 23' (optional)
+        due_date: Specific date in YYYY-MM-DD format relative to user's timezone (optional)
+        due_datetime: Specific date and time in RFC3339 format in UTC (optional)
+        due_lang: 2-letter code specifying language in case due_string is not written in English (optional)
+        assignee_id: The responsible user ID (only applies to shared tasks) (optional)
+        duration: A positive integer for the amount of duration_unit the task will take (optional)
+        duration_unit: The unit of time that the duration field represents (minute or day) (optional)
+        deadline_date: Specific date in YYYY-MM-DD format relative to user's timezone (optional)
+        deadline_lang: 2-letter code specifying language of deadline (optional)
     """
     todoist_client = ctx.request_context.lifespan_context.todoist_client
 
     try:
         logger.info(f"Creating task: {content}")
 
-        # Create task parameters
-        task_params = {
-            "content": content
+        # Start with required parameters
+        task_params = {"content": content}
+
+        # Add all optional parameters in a cleaner way
+        optional_params = {
+            "description": description,
+            "project_id": project_id,
+            "section_id": section_id,
+            "parent_id": parent_id,
+            "order": order,
+            "labels": labels,
+            "assignee_id": assignee_id,
+            "due_string": due_string,
+            "due_date": due_date,
+            "due_datetime": due_datetime,
+            "due_lang": due_lang,
+            "deadline_date": deadline_date,
+            "deadline_lang": deadline_lang,
         }
 
-        # Add optional parameters if provided
-        if description:
-            task_params["description"] = description
-        if due_string:
-            task_params["due_string"] = due_string
-        if priority and 1 <= priority <= 4:
+        # Add non-null parameters to task_params
+        for key, value in optional_params.items():
+            if value is not None:
+                task_params[key] = value
+
+        # Special handling for priority (must be 1-4)
+        if priority is not None and 1 <= priority <= 4:
             task_params["priority"] = priority
+
+        # Special handling for duration (must have both duration and unit)
+        if duration is not None and duration_unit is not None:
+            if duration > 0 and duration_unit in ["minute", "day"]:
+                task_params["duration"] = duration
+                task_params["duration_unit"] = duration_unit
+            else:
+                logger.warning("Invalid duration parameters: duration must be > 0 and unit must be 'minute' or 'day'")
 
         # Create the task
         task = todoist_client.add_task(**task_params)
 
-        # Format response
-        response = f"Task created:\nTitle: {task.content}"
-        if hasattr(task, 'description') and task.description:
-            response += f"\nDescription: {task.description}"
+        # Process the response
+        # Define attributes to check and their descriptions
+        attribute_mapping = {
+            "content": "Title",
+            "description": "Description",
+            "priority": "Priority",
+            "project_id": "Project ID",
+            "section_id": "Section ID",
+            "parent_id": "Parent Task ID",
+            "assignee_id": "Assigned to",
+            "labels": "Labels",
+        }
+
+        # Start with base response
+        response_lines = [f"Task created:"]
+
+        # Add simple attributes
+        for attr, label in attribute_mapping.items():
+            if hasattr(task, attr):
+                value = getattr(task, attr)
+                if value:
+                    if attr == "labels" and isinstance(value, list):
+                        response_lines.append(f"{label}: {', '.join(value)}")
+                    else:
+                        response_lines.append(f"{label}: {value}")
+
+        # Handle complex objects (due, deadline, duration)
         if hasattr(task, 'due') and task.due:
-            response += f"\nDue: {task.due.string}"
-        if hasattr(task, 'priority') and task.priority:
-            response += f"\nPriority: {task.priority}"
+            response_lines.append(f"Due: {task.due.string}")
+
+        if hasattr(task, 'deadline') and task.deadline:
+            response_lines.append(f"Deadline: {task.deadline.date}")
+
+        if hasattr(task, 'duration') and task.duration:
+            amount = task.duration.get('amount')
+            unit = task.duration.get('unit')
+            if amount and unit:
+                response_lines.append(f"Duration: {amount} {unit}(s)")
 
         logger.info(f"Task created successfully: {task.id}")
-        return response
+        return "\n".join(response_lines)
     except Exception as error:
         logger.error(f"Error creating task: {error}")
         return f"Error creating task: {str(error)}"
@@ -122,8 +202,17 @@ def todoist_update_task(
     task_name: str,
     content: Optional[str] = None,
     description: Optional[str] = None,
+    labels: Optional[list[str]] = None,
+    priority: Optional[int] = None,
     due_string: Optional[str] = None,
-    priority: Optional[int] = None
+    due_date: Optional[str] = None,
+    due_datetime: Optional[str] = None,
+    due_lang: Optional[str] = None,
+    assignee_id: Optional[str] = None,
+    duration: Optional[int] = None,
+    duration_unit: Optional[str] = None,
+    deadline_date: Optional[str] = None,
+    deadline_lang: Optional[str] = None
 ) -> str:
     """Update an existing task in Todoist by searching for it by name and then updating it
 
@@ -131,8 +220,17 @@ def todoist_update_task(
         task_name: Name/content of the task to search for and update
         content: New content/title for the task (optional)
         description: New description for the task (optional)
-        due_string: New due date in natural language like 'tomorrow', 'next Monday' (optional)
+        labels: New labels for the task (optional)
         priority: New priority level from 1 (normal) to 4 (urgent) (optional)
+        due_string: New due date in natural language like 'tomorrow', 'next Monday' (optional)
+        due_date: New specific date in YYYY-MM-DD format (optional)
+        due_datetime: New specific date and time in RFC3339 format in UTC (optional)
+        due_lang: 2-letter code specifying language in case due_string is not written in English (optional)
+        assignee_id: The responsible user ID or null to unset (for shared tasks) (optional)
+        duration: A positive integer for the amount of duration_unit the task will take (optional)
+        duration_unit: The unit of time that the duration field represents (minute or day) (optional)
+        deadline_date: Specific date in YYYY-MM-DD format relative to user's timezone (optional)
+        deadline_lang: 2-letter code specifying language of deadline (optional)
     """
     todoist_client = ctx.request_context.lifespan_context.todoist_client
 
@@ -154,14 +252,37 @@ def todoist_update_task(
 
         # Build update data
         update_data = {}
-        if content:
-            update_data["content"] = content
-        if description:
-            update_data["description"] = description
-        if due_string:
-            update_data["due_string"] = due_string
-        if priority and 1 <= priority <= 4:
+
+        # Define all updateable parameters
+        optional_params = {
+            "content": content,
+            "description": description,
+            "labels": labels,
+            "due_string": due_string,
+            "due_date": due_date,
+            "due_datetime": due_datetime,
+            "due_lang": due_lang,
+            "assignee_id": assignee_id,
+            "deadline_date": deadline_date,
+            "deadline_lang": deadline_lang,
+        }
+
+        # Add non-null parameters to update_data
+        for key, value in optional_params.items():
+            if value is not None:
+                update_data[key] = value
+
+        # Special handling for priority (must be 1-4)
+        if priority is not None and 1 <= priority <= 4:
             update_data["priority"] = priority
+
+        # Special handling for duration (must have both duration and unit)
+        if duration is not None and duration_unit is not None:
+            if duration > 0 and duration_unit in ["minute", "day"]:
+                update_data["duration"] = duration
+                update_data["duration_unit"] = duration_unit
+            else:
+                logger.warning("Invalid duration parameters: duration must be > 0 and unit must be 'minute' or 'day'")
 
         # Update the task
         is_success = todoist_client.update_task(task_id=matching_task.id, **update_data)
@@ -169,18 +290,45 @@ def todoist_update_task(
         if is_success:
             logger.info(f"Task updated successfully: {matching_task.id}")
 
-            # Format response
-            response = f"Task \"{matching_task.content}\" updated:"
-            if content:
-                response += f"\nNew Title: {content}"
-            if description:
-                response += f"\nNew Description: {description}"
-            if due_string:
-                response += f"\nNew Due Date: derived from '{due_string}'"
-            if priority:
-                response += f"\nNew Priority: {priority}"
+            # Create a descriptive response about what was updated
+            response_lines = [f"Task \"{matching_task.content}\" updated:"]
 
-            return response
+            # Map parameters to human-readable descriptions
+            update_descriptions = {
+                "content": "New Title",
+                "description": "New Description",
+                "labels": "New Labels",
+                "priority": "New Priority",
+                "assignee_id": "New Assignee",
+            }
+
+            # Add basic parameter updates to response
+            for param, description in update_descriptions.items():
+                if param in update_data:
+                    value = update_data[param]
+                    if param == "labels" and isinstance(value, list):
+                        response_lines.append(f"{description}: {', '.join(value)}")
+                    else:
+                        response_lines.append(f"{description}: {value}")
+
+            # Handle special cases for due dates
+            if any(key in update_data for key in ["due_string", "due_date", "due_datetime"]):
+                if "due_string" in update_data:
+                    response_lines.append(f"New Due Date: derived from '{update_data['due_string']}'")
+                elif "due_date" in update_data:
+                    response_lines.append(f"New Due Date: {update_data['due_date']}")
+                elif "due_datetime" in update_data:
+                    response_lines.append(f"New Due Date: {update_data['due_datetime']}")
+
+            # Handle duration
+            if "duration" in update_data and "duration_unit" in update_data:
+                response_lines.append(f"New Duration: {update_data['duration']} {update_data['duration_unit']}(s)")
+
+            # Handle deadline
+            if "deadline_date" in update_data:
+                response_lines.append(f"New Deadline: {update_data['deadline_date']}")
+
+            return "\n".join(response_lines)
         else:
             logger.warning(f"Task update failed for task ID: {matching_task.id}")
             return "Task update failed"
