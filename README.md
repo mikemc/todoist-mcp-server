@@ -45,5 +45,5 @@ To see currently available tools,
 
 ```sh
 # (For Mac) With GNU grep installed as ggrep
-ggrep -A 1 '@mcp.tool()' main.py | ggrep -Po '(?<=^def )([^(]+)'
+ggrep -Po '(?<=^mcp.tool\(\)\()([^)]+)' main.py
 ```
