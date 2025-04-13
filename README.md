@@ -47,3 +47,7 @@ To see currently available tools,
 # (For Mac) With GNU grep installed as ggrep
 ggrep -Po '(?<=^mcp.tool\(\)\()([^)]+)' main.py
 ```
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
