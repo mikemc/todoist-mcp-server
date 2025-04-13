@@ -8,3 +8,4 @@ dependencies = [
     "mcp[cli]>=1.6.0",
     "todoist-api-python>=2.1.7",
 ]
+license = "MIT"
