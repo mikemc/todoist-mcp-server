@@ -7,7 +7,7 @@ This is a Python port of this [TypeScript Todoist MCP server](https://github.com
 ### Prerequisites
 
 * Python 3.10+
-* UV package manager ([installation guide](https://docs.astral.sh/uv/installation/))
+* UV package manager ([installation guide](https://docs.astral.sh/uv/getting-started/installation/))
 * Todoist API token
 
 ### Getting a Todoist API Token
