@@ -41,12 +41,31 @@ Add to your claude_desktop_config.json:
 
 ## Available Tools
 
-To see currently available tools,
+To see currently available tools, run
 
 ```sh
-# (For Mac) With GNU grep installed as ggrep
+# With GNU grep installed as ggrep (as with `brew install grep` on Mac)
 ggrep -Po '(?<=^mcp.tool\(\)\()([^)]+)' main.py
 ```
+
+As of 2025-04-20,
+
+- Projects
+  - `todoist_get_projects`
+  - `todoist_add_project`
+  - `todoist_delete_project`
+- Sections
+  - `todoist_get_sections`
+  - `todoist_get_section`
+  - `todoist_add_section`
+  - `todoist_update_section`
+  - `todoist_delete_section`
+- Tasks
+  - `todoist_create_task`
+  - `todoist_get_tasks`
+  - `todoist_update_task`
+  - `todoist_delete_task`
+  - `todoist_complete_task`
 
 ## License
 
