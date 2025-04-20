@@ -52,7 +52,9 @@ As of 2025-04-20,
 
 - Projects
   - `todoist_get_projects`
+  - `todoist_get_project`
   - `todoist_add_project`
+  - `todoist_update_project`
   - `todoist_delete_project`
 - Sections
   - `todoist_get_sections`

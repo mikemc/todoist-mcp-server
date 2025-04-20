@@ -27,6 +27,30 @@ def todoist_get_projects(ctx: Context) -> str:
         logger.error(f"Error getting projects: {error}")
         return f"Error getting projects: {str(error)}"
 
+def todoist_get_project(ctx: Context, project_id: str) -> str:
+    """Get a single project from Todoist
+
+    Args:
+        project_id: ID of the project to retrieve
+    """
+    todoist_client = ctx.request_context.lifespan_context.todoist_client
+
+    try:
+        logger.info(f"Getting project with ID: {project_id}")
+
+        # Get the project
+        project = todoist_client.get_project(project_id=project_id)
+
+        if not project:
+            logger.info(f"No project found with ID: {project_id}")
+            return f"No project found with ID: {project_id}"
+
+        logger.info(f"Retrieved project: {project.id}")
+        return project
+    except Exception as error:
+        logger.error(f"Error getting project: {error}")
+        return f"Error getting project: {str(error)}"
+
 def todoist_add_project(
     ctx: Context,
     name: str,
@@ -72,6 +96,76 @@ def todoist_add_project(
     except Exception as error:
         logger.error(f"Error creating project: {error}")
         return f"Error creating project: {str(error)}"
+
+def todoist_update_project(
+    ctx: Context,
+    project_id: str,
+    name: Optional[str] = None,
+    color: Optional[str] = None,
+    is_favorite: Optional[bool] = None,
+    view_style: Optional[str] = None
+) -> str:
+    """Update an existing project in Todoist
+
+    Args:
+        project_id: ID of the project to update
+        name: New name for the project (optional)
+        color: New color for the project (optional)
+        is_favorite: Whether the project should be marked as favorite (optional)
+        view_style: View style of the project, either 'list' or 'board' (optional)
+    """
+    todoist_client = ctx.request_context.lifespan_context.todoist_client
+
+    try:
+        logger.info(f"Updating project with ID: {project_id}")
+
+        # Verify the project exists
+        try:
+            original_project = todoist_client.get_project(project_id=project_id)
+            if not original_project:
+                logger.warning(f"No project found with ID: {project_id}")
+                return f"Could not find a project with ID: {project_id}"
+
+            original_name = original_project.name
+        except Exception:
+            # If we can't verify, we'll still attempt to update
+            original_name = "Unknown"
+
+        # Build update parameters
+        update_params = {"project_id": project_id}
+        if name:
+            update_params["name"] = name
+        if color:
+            update_params["color"] = color
+        if is_favorite is not None:
+            update_params["is_favorite"] = is_favorite
+        if view_style and view_style in ["list", "board"]:
+            update_params["view_style"] = view_style
+
+        # If no update parameters provided, return early
+        if len(update_params) <= 1:  # Only project_id
+            return "No update parameters provided"
+
+        # Update the project
+        updated_project = todoist_client.update_project(**update_params)
+
+        # Create a descriptive response
+        response_lines = [f"Project updated successfully: {original_name} (ID: {project_id})"]
+
+        # Add details about what was updated
+        if name:
+            response_lines.append(f"Name changed from '{original_name}' to '{name}'")
+        if color:
+            response_lines.append(f"Color changed to '{color}'")
+        if is_favorite is not None:
+            response_lines.append(f"Favorite status: {'Yes' if is_favorite else 'No'}")
+        if view_style:
+            response_lines.append(f"View style changed to '{view_style}'")
+
+        return "\n".join(response_lines)
+    except Exception as error:
+        logger.error(f"Error updating project: {error}")
+        return f"Error updating project: {str(error)}"
 
 def todoist_delete_project(ctx: Context, project_id: str) -> str:
     """Deletes a project from the user's Todoist account

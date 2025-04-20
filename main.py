@@ -12,7 +12,9 @@ from src.api import get_api_client
 # Import functions directly
 from src.projects import (
     todoist_get_projects,
+    todoist_get_project,
     todoist_add_project,
+    todoist_update_project,
     todoist_delete_project,
 )
 from src.sections import (
@@ -59,7 +61,9 @@ mcp = FastMCP("Todoist MCP Server", lifespan=app_lifespan)
 
 # Register project tools
 mcp.tool()(todoist_get_projects)
+mcp.tool()(todoist_get_project)
 mcp.tool()(todoist_add_project)
+mcp.tool()(todoist_update_project)
 mcp.tool()(todoist_delete_project)
 
 # Register section tools
