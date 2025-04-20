@@ -92,47 +92,8 @@ def todoist_create_task(
         # Create the task
         task = todoist_client.add_task(**task_params)
 
-        # Process the response
-        # Define attributes to check and their descriptions
-        attribute_mapping = {
-            "content": "Title",
-            "description": "Description",
-            "priority": "Priority",
-            "project_id": "Project ID",
-            "section_id": "Section ID",
-            "parent_id": "Parent Task ID",
-            "assignee_id": "Assigned to",
-            "labels": "Labels",
-        }
-
-        # Start with base response
-        response_lines = [f"Task created:"]
-
-        # Add simple attributes
-        for attr, label in attribute_mapping.items():
-            if hasattr(task, attr):
-                value = getattr(task, attr)
-                if value:
-                    if attr == "labels" and isinstance(value, list):
-                        response_lines.append(f"{label}: {', '.join(value)}")
-                    else:
-                        response_lines.append(f"{label}: {value}")
-
-        # Handle complex objects (due, deadline, duration)
-        if hasattr(task, 'due') and task.due:
-            response_lines.append(f"Due: {task.due.string}")
-
-        if hasattr(task, 'deadline') and task.deadline:
-            response_lines.append(f"Deadline: {task.deadline.date}")
-
-        if hasattr(task, 'duration') and task.duration:
-            amount = task.duration.get('amount')
-            unit = task.duration.get('unit')
-            if amount and unit:
-                response_lines.append(f"Duration: {amount} {unit}(s)")
-
         logger.info(f"Task created successfully: {task.id}")
-        return "\n".join(response_lines)
+        return task
     except Exception as error:
         logger.error(f"Error creating task: {error}")
         return f"Error creating task: {str(error)}"
@@ -180,19 +141,8 @@ def todoist_get_tasks(
             logger.info("No tasks found matching the criteria")
             return "No tasks found matching the criteria"
 
-        task_list = []
-        for task in tasks:
-            task_text = f"- {task.content}"
-            if hasattr(task, 'description') and task.description:
-                task_text += f"\n  Description: {task.description}"
-            if hasattr(task, 'due') and task.due:
-                task_text += f"\n  Due: {task.due.string}"
-            if hasattr(task, 'priority') and task.priority:
-                task_text += f"\n  Priority: {task.priority}"
-            task_list.append(task_text)
-
         logger.info(f"Retrieved {len(tasks)} tasks")
-        return "\n\n".join(task_list)
+        return tasks
     except Exception as error:
         logger.error(f"Error getting tasks: {error}")
         return f"Error getting tasks: {str(error)}"

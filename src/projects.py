@@ -8,9 +8,6 @@ logger = logging.getLogger("todoist-mcp-server")
 
 def todoist_get_projects(ctx: Context) -> str:
     """Get all projects from the user's Todoist account
-
-    Returns:
-        A formatted list of all projects with their IDs, names, and other details
     """
     todoist_client = ctx.request_context.lifespan_context.todoist_client
 
@@ -24,21 +21,8 @@ def todoist_get_projects(ctx: Context) -> str:
             logger.info("No projects found")
             return "No projects found in your Todoist account"
 
-        # Format response
-        project_list = []
-        for project in projects:
-            project_text = f"- {project.name} (ID: {project.id})"
-            if hasattr(project, 'is_favorite') and project.is_favorite:
-                project_text += "\n  Favorite: Yes"
-            if hasattr(project, 'is_shared') and project.is_shared:
-                project_text += "\n  Shared: Yes"
-            if hasattr(project, 'parent_id') and project.parent_id:
-                project_text += f"\n  Parent ID: {project.parent_id}"
-
-            project_list.append(project_text)
-
         logger.info(f"Retrieved {len(projects)} projects")
-        return "\n\n".join(project_list)
+        return projects
     except Exception as error:
         logger.error(f"Error getting projects: {error}")
         return f"Error getting projects: {str(error)}"
@@ -83,19 +67,8 @@ def todoist_add_project(
         # Create the project
         project = todoist_client.add_project(**project_params)
 
-        # Format response
-        response = f"Project created:\nName: {project.name} (ID: {project.id})"
-        if hasattr(project, 'color') and project.color:
-            response += f"\nColor: {project.color}"
-        if hasattr(project, 'parent_id') and project.parent_id:
-            response += f"\nParent Project ID: {project.parent_id}"
-        if hasattr(project, 'is_favorite') and project.is_favorite:
-            response += "\nFavorite: Yes"
-        if hasattr(project, 'view_style') and project.view_style:
-            response += f"\nView Style: {project.view_style}"
-
         logger.info(f"Project created successfully: {project.id}")
-        return response
+        return project
     except Exception as error:
         logger.error(f"Error creating project: {error}")
         return f"Error creating project: {str(error)}"
