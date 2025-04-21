@@ -147,6 +147,30 @@ def todoist_get_tasks(
         logger.error(f"Error getting tasks: {error}")
         return f"Error getting tasks: {str(error)}"
 
+def todoist_get_task(ctx: Context, task_id: str) -> str:
+    """Get an active task from Todoist
+
+    Args:
+        task_id: ID of the task to retrieve
+    """
+    todoist_client = ctx.request_context.lifespan_context.todoist_client
+
+    try:
+        logger.info(f"Getting task with ID: {task_id}")
+
+        # Get the task
+        task = todoist_client.get_task(task_id=task_id)
+
+        if not task:
+            logger.info(f"No task found with ID: {task_id}")
+            return f"No task found with ID: {task_id}"
+
+        logger.info(f"Retrieved task: {task.id}")
+        return task
+    except Exception as error:
+        logger.error(f"Error getting task: {error}")
+        return f"Error getting task: {str(error)}"
+
 def todoist_update_task(
     ctx: Context,
     task_id: str,

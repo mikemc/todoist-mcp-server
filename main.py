@@ -27,6 +27,7 @@ from src.sections import (
 from src.tasks import (
     todoist_create_task,
     todoist_get_tasks,
+    todoist_get_task,
     todoist_update_task,
     todoist_close_task,
     todoist_delete_task,
@@ -75,6 +76,7 @@ mcp.tool()(todoist_delete_section)
 
 # Register task tools
 mcp.tool()(todoist_get_tasks)
+mcp.tool()(todoist_get_task)
 mcp.tool()(todoist_create_task)
 mcp.tool()(todoist_update_task)
 mcp.tool()(todoist_close_task)
