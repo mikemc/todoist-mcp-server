@@ -108,31 +108,19 @@ def todoist_update_section(ctx: Context, section_id: str, name: str) -> str:
     try:
         logger.info(f"Updating section with ID: {section_id}")
 
-        # Verify the section exists
         try:
-            sections = todoist_client.get_sections()
-            section_to_update = None
-
-            for section in sections:
-                if section.id == section_id:
-                    section_to_update = section
-                    break
-
-            if not section_to_update:
-                logger.warning(f"No section found with ID: {section_id}")
-                return f"Could not find a section with ID: {section_id}"
-
-            old_name = section_to_update.name
-
-        except Exception:
-            # If we can't verify, we'll still attempt to update
-            old_name = "Unknown"
+            section = todoist_client.get_section(section_id=section_id)
+            original_name = section.name
+        except Exception as error:
+            logger.warning(f"Error getting section with ID: {section_id}: {error}")
+            return f"Could not verify section with ID: {section_id}. Update aborted."
 
         # Update the section
         updated_section = todoist_client.update_section(section_id=section_id, name=name)
 
         logger.info(f"Section updated successfully: {section_id}")
-        return f"Successfully updated section from '{old_name}' to '{name}' (ID: {section_id})"
+        response = f"Successfully updated section from '{original_name}' to '{name}' (ID: {section_id})"
+        return response, updated_section
 
     except Exception as error:
         logger.error(f"Error updating section: {error}")
@@ -149,37 +137,18 @@ def todoist_delete_section(ctx: Context, section_id: str) -> str:
     try:
         logger.info(f"Deleting section with ID: {section_id}")
 
-        # Verify the section exists and get name
         try:
-            sections = todoist_client.get_sections()
-            section_to_delete = None
-
-            for section in sections:
-                if section.id == section_id:
-                    section_to_delete = section
-                    break
-
-            if not section_to_delete:
-                logger.warning(f"No section found with ID: {section_id}")
-                return f"Could not find a section with ID: {section_id}"
-
-            section_name = section_to_delete.name
-            project_id = section_to_delete.project_id
-
-        except Exception:
-            # If we can't verify, we'll still attempt to delete
-            section_name = "Unknown"
-            project_id = "Unknown"
+            section = todoist_client.get_section(section_id=section_id)
+            section_name = section.name
+        except Exception as error:
+            logger.warning(f"Error getting section with ID: {section_id}: {error}")
+            return f"Could not verify section with ID: {section_id}. Update aborted."
 
         # Delete the section
         is_success = todoist_client.delete_section(section_id=section_id)
 
-        if is_success:
-            logger.info(f"Section deleted successfully: {section_id}")
-            return f"Successfully deleted section: {section_name} (ID: {section_id}) from project ID: {project_id}"
-        else:
-            logger.warning(f"Section deletion failed for section ID: {section_id}")
-            return "Section deletion failed"
+        logger.info(f"Section deleted successfully: {section_id}")
+        return f"Successfully deleted section: {section_name} (ID: {section_id})"
 
     except Exception as error:
         logger.error(f"Error deleting section: {error}")

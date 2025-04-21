@@ -119,19 +119,16 @@ def todoist_update_project(
     try:
         logger.info(f"Updating project with ID: {project_id}")
 
-        # Verify the project exists
         try:
-            original_project = todoist_client.get_project(project_id=project_id)
-            if not original_project:
-                logger.warning(f"No project found with ID: {project_id}")
-                return f"Could not find a project with ID: {project_id}"
+            project = todoist_client.get_project(project_id=project_id)
+            original_name = project.name
+        except Exception as error:
+            logger.warning(f"Error getting project with ID: {project_id}: {error}")
+            return f"Could not verify project with ID: {project_id}. Update aborted."
 
-            original_name = original_project.name
-        except Exception:
-            # If we can't verify, we'll still attempt to update
-            original_name = "Unknown"
-
-        # Build update parameters
+        # Build update parameters to pass to todoist API call
+        # TODO: Look for a cleaner/less verbose way to do this, which is less
+        # redundant with the given parameters
         update_params = {"project_id": project_id}
         if name:
             update_params["name"] = name
@@ -142,27 +139,15 @@ def todoist_update_project(
         if view_style and view_style in ["list", "board"]:
             update_params["view_style"] = view_style
 
-        # If no update parameters provided, return early
         if len(update_params) <= 1:  # Only project_id
-            return "No update parameters provided"
+            return f"No update parameters provided for project: {original_name} (ID: {project_id})"
 
-        # Update the project
         updated_project = todoist_client.update_project(**update_params)
 
-        # Create a descriptive response
-        response_lines = [f"Project updated successfully: {original_name} (ID: {project_id})"]
+        logger.info(f"Project updated successfully: {project_id}")
+        response = f"Successfully updated project: {original_name} (ID: {project_id})"
+        return response, updated_project
 
-        # Add details about what was updated
-        if name:
-            response_lines.append(f"Name changed from '{original_name}' to '{name}'")
-        if color:
-            response_lines.append(f"Color changed to '{color}'")
-        if is_favorite is not None:
-            response_lines.append(f"Favorite status: {'Yes' if is_favorite else 'No'}")
-        if view_style:
-            response_lines.append(f"View style changed to '{view_style}'")
-
-        return "\n".join(response_lines)
     except Exception as error:
         logger.error(f"Error updating project: {error}")
         return f"Error updating project: {str(error)}"
@@ -178,35 +163,17 @@ def todoist_delete_project(ctx: Context, project_id: str) -> str:
     try:
         logger.info(f"Deleting project with ID: {project_id}")
 
-        # Verify the project exists and get name
         try:
-            projects = todoist_client.get_projects()
-            project_to_delete = None
+            project = todoist_client.get_project(project_id=project_id)
+            project_name = project.name
+        except Exception as error:
+            logger.warning(f"Error getting project with ID: {project_id}: {error}")
+            return f"Could not verify project with ID: {project_id}. Deletion aborted."
 
-            for project in projects:
-                if project.id == project_id:
-                    project_to_delete = project
-                    break
-
-            if not project_to_delete:
-                logger.warning(f"No project found with ID: {project_id}")
-                return f"Could not find a project with ID: {project_id}"
-
-            project_name = project_to_delete.name
-
-        except Exception:
-            # If we can't verify, we'll still attempt to delete
-            project_name = "Unknown"
-
-        # Delete the project
         is_success = todoist_client.delete_project(project_id=project_id)
 
-        if is_success:
-            logger.info(f"Project deleted successfully: {project_id}")
-            return f"Successfully deleted project: {project_name} (ID: {project_id})"
-        else:
-            logger.warning(f"Project deletion failed for project ID: {project_id}")
-            return "Project deletion failed"
+        logger.info(f"Project deleted successfully: {project_id} ({project_name})")
+        return f"Successfully deleted project: {project_name} (ID: {project_id})"
 
     except Exception as error:
         logger.error(f"Error deleting project: {error}")
