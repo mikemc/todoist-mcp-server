@@ -30,6 +30,7 @@ from src.tasks import (
     todoist_get_task,
     todoist_update_task,
     todoist_close_task,
+    todoist_reopen_task,
     todoist_delete_task,
 )
 
@@ -80,6 +81,7 @@ mcp.tool()(todoist_get_task)
 mcp.tool()(todoist_create_task)
 mcp.tool()(todoist_update_task)
 mcp.tool()(todoist_close_task)
+mcp.tool()(todoist_reopen_task)
 mcp.tool()(todoist_delete_task)
 
 # Run the server

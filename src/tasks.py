@@ -288,15 +288,38 @@ def todoist_close_task(ctx: Context, task_id: str) -> str:
 
         is_success = todoist_client.close_task(task_id=task_id)
 
-        if is_success:
-            logger.info(f"Task closed successfully: {task_id}")
-            return f"Successfully closed task: {task_content} (ID: {task_id})"
-        else:
-            logger.warning(f"Task closing failed for task ID: {task_id}")
-            return "Task closing failed"
+        logger.info(f"Task closed successfully: {task_id}")
+        return f"Successfully closed task: {task_content} (ID: {task_id})"
     except Exception as error:
         logger.error(f"Error closing task: {error}")
         return f"Error closing task: {str(error)}"
+
+def todoist_reopen_task(ctx: Context, task_id: str) -> str:
+    """Reopen a task in Todoist (i.e., mark the task as incomplete)
+
+    Args:
+        task_id: ID of the task to reopen
+    """
+    todoist_client = ctx.request_context.lifespan_context.todoist_client
+
+    try:
+        logger.info(f"Reopening task with ID: {task_id}")
+
+        # First, verify the task exists
+        try:
+            task = todoist_client.get_task(task_id=task_id)
+            task_content = task.content
+        except Exception as error:
+            logger.warning(f"Error getting task with ID: {task_id}: {error}")
+            return f"Could not verify task with ID: {task_id}. Task reopening aborted."
+
+        is_success = todoist_client.reopen_task(task_id=task_id)
+
+        logger.info(f"Task reopened successfully: {task_id}")
+        return f"Successfully reopened task: {task_content} (ID: {task_id})"
+    except Exception as error:
+        logger.error(f"Error reopening task: {error}")
+        return f"Error reopening task: {str(error)}"
 
 def todoist_delete_task(ctx: Context, task_id: str) -> str:
     """Delete a task from Todoist
@@ -320,12 +343,8 @@ def todoist_delete_task(ctx: Context, task_id: str) -> str:
         # Delete the task
         is_success = todoist_client.delete_task(task_id=task_id)
 
-        if is_success:
-            logger.info(f"Task deleted successfully: {task_id}")
-            return f"Successfully deleted task: {task_content} (ID: {task_id})"
-        else:
-            logger.warning(f"Task deletion failed for task ID: {task_id}")
-            return "Task deletion failed"
+        logger.info(f"Task deleted successfully: {task_id}")
+        return f"Successfully deleted task: {task_content} (ID: {task_id})"
     except Exception as error:
         logger.error(f"Error deleting task: {error}")
         return f"Error deleting task: {str(error)}"
