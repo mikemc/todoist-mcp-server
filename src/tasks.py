@@ -149,7 +149,7 @@ def todoist_get_tasks(
 
 def todoist_update_task(
     ctx: Context,
-    task_name: str,
+    task_id: str,
     content: Optional[str] = None,
     description: Optional[str] = None,
     labels: Optional[list[str]] = None,
@@ -164,10 +164,10 @@ def todoist_update_task(
     deadline_date: Optional[str] = None,
     deadline_lang: Optional[str] = None
 ) -> str:
-    """Update an existing task in Todoist by searching for it by name and then updating it
+    """Update an existing task in Todoist
 
     Args:
-        task_name: Name/content of the task to search for and update
+        task_id: ID of the task to update
         content: New content/title for the task (optional)
         description: New description for the task (optional)
         labels: New labels for the task (optional)
@@ -185,23 +185,18 @@ def todoist_update_task(
     todoist_client = ctx.request_context.lifespan_context.todoist_client
 
     try:
-        logger.info(f"Updating task matching: {task_name}")
+        logger.info(f"Updating task with ID: {task_id}")
 
-        # First, search for the task
-        tasks = todoist_client.get_tasks()
-        matching_task = None
-
-        for task in tasks:
-            if task_name.lower() in task.content.lower():
-                matching_task = task
-                break
-
-        if not matching_task:
-            logger.warning(f"No task found matching: {task_name}")
-            return f"Could not find a task matching \"{task_name}\""
+        # First, get the task to verify it exists
+        try:
+            task = todoist_client.get_task(task_id=task_id)
+            original_content = task.content
+        except Exception as error:
+            logger.warning(f"Error getting task with ID: {task_id}: {error}")
+            return f"Could not verify task with ID: {task_id}. Update aborted."
 
         # Build update data
-        update_data = {}
+        update_data = {"task_id": task_id}
 
         # Define all updateable parameters
         optional_params = {
@@ -234,128 +229,80 @@ def todoist_update_task(
             else:
                 logger.warning("Invalid duration parameters: duration must be > 0 and unit must be 'minute' or 'day'")
 
+        if len(update_data) <= 1:  # Only task_id
+            return f"No update parameters provided for task: {original_content} (ID: {task_id})"
+
         # Update the task
-        is_success = todoist_client.update_task(task_id=matching_task.id, **update_data)
+        updated_task = todoist_client.update_task(**update_data)
 
-        if is_success:
-            logger.info(f"Task updated successfully: {matching_task.id}")
+        logger.info(f"Task updated successfully: {task_id}")
 
-            # Create a descriptive response about what was updated
-            response_lines = [f"Task \"{matching_task.content}\" updated:"]
-
-            # Map parameters to human-readable descriptions
-            update_descriptions = {
-                "content": "New Title",
-                "description": "New Description",
-                "labels": "New Labels",
-                "priority": "New Priority",
-                "assignee_id": "New Assignee",
-            }
-
-            # Add basic parameter updates to response
-            for param, description in update_descriptions.items():
-                if param in update_data:
-                    value = update_data[param]
-                    if param == "labels" and isinstance(value, list):
-                        response_lines.append(f"{description}: {', '.join(value)}")
-                    else:
-                        response_lines.append(f"{description}: {value}")
-
-            # Handle special cases for due dates
-            if any(key in update_data for key in ["due_string", "due_date", "due_datetime"]):
-                if "due_string" in update_data:
-                    response_lines.append(f"New Due Date: derived from '{update_data['due_string']}'")
-                elif "due_date" in update_data:
-                    response_lines.append(f"New Due Date: {update_data['due_date']}")
-                elif "due_datetime" in update_data:
-                    response_lines.append(f"New Due Date: {update_data['due_datetime']}")
-
-            # Handle duration
-            if "duration" in update_data and "duration_unit" in update_data:
-                response_lines.append(f"New Duration: {update_data['duration']} {update_data['duration_unit']}(s)")
-
-            # Handle deadline
-            if "deadline_date" in update_data:
-                response_lines.append(f"New Deadline: {update_data['deadline_date']}")
-
-            return "\n".join(response_lines)
-        else:
-            logger.warning(f"Task update failed for task ID: {matching_task.id}")
-            return "Task update failed"
+        response = f"Successfully updated task: {original_content} (ID: {task_id})"
+        return response, updated_task
     except Exception as error:
         logger.error(f"Error updating task: {error}")
         return f"Error updating task: {str(error)}"
 
-def todoist_delete_task(ctx: Context, task_name: str) -> str:
-    """Delete a task from Todoist by searching for it by name
+def todoist_close_task(ctx: Context, task_id: str) -> str:
+    """Close a task in Todoist (i.e., mark the task as complete)
 
     Args:
-        task_name: Name/content of the task to search for and delete
+        task_id: ID of the task to complete
     """
     todoist_client = ctx.request_context.lifespan_context.todoist_client
 
     try:
-        logger.info(f"Deleting task matching: {task_name}")
+        logger.info(f"Closing task with ID: {task_id}")
 
-        # First, search for the task
-        tasks = todoist_client.get_tasks()
-        matching_task = None
+        # First, verify the task exists
+        try:
+            task = todoist_client.get_task(task_id=task_id)
+            task_content = task.content
+        except Exception as error:
+            logger.warning(f"Error getting task with ID: {task_id}: {error}")
+            return f"Could not verify task with ID: {task_id}. Completion aborted."
 
-        for task in tasks:
-            if task_name.lower() in task.content.lower():
-                matching_task = task
-                break
-
-        if not matching_task:
-            logger.warning(f"No task found matching: {task_name}")
-            return f"Could not find a task matching \"{task_name}\""
-
-        # Delete the task
-        is_success = todoist_client.delete_task(task_id=matching_task.id)
+        # Complete the task
+        is_success = todoist_client.close_task(task_id=task_id)
 
         if is_success:
-            logger.info(f"Task deleted successfully: {matching_task.id}")
-            return f"Successfully deleted task: \"{matching_task.content}\""
+            logger.info(f"Task completed successfully: {task_id}")
+            return f"Successfully closed task: {task_content} (ID: {task_id})"
         else:
-            logger.warning(f"Task deletion failed for task ID: {matching_task.id}")
+            logger.warning(f"Task completion failed for task ID: {task_id}")
+            return "Task closing failed"
+    except Exception as error:
+        logger.error(f"Error completing task: {error}")
+        return f"Error closing task: {str(error)}"
+
+def todoist_delete_task(ctx: Context, task_id: str) -> str:
+    """Delete a task from Todoist
+
+    Args:
+        task_id: ID of the task to delete
+    """
+    todoist_client = ctx.request_context.lifespan_context.todoist_client
+
+    try:
+        logger.info(f"Deleting task with ID: {task_id}")
+
+        # First, verify the task exists
+        try:
+            task = todoist_client.get_task(task_id=task_id)
+            task_content = task.content
+        except Exception as error:
+            logger.warning(f"Error getting task with ID: {task_id}: {error}")
+            return f"Could not verify task with ID: {task_id}. Deletion aborted."
+
+        # Delete the task
+        is_success = todoist_client.delete_task(task_id=task_id)
+
+        if is_success:
+            logger.info(f"Task deleted successfully: {task_id}")
+            return f"Successfully deleted task: {task_content} (ID: {task_id})"
+        else:
+            logger.warning(f"Task deletion failed for task ID: {task_id}")
             return "Task deletion failed"
     except Exception as error:
         logger.error(f"Error deleting task: {error}")
         return f"Error deleting task: {str(error)}"
-
-def todoist_complete_task(ctx: Context, task_name: str) -> str:
-    """Mark a task as complete by searching for it by name
-
-    Args:
-        task_name: Name/content of the task to search for and complete
-    """
-    todoist_client = ctx.request_context.lifespan_context.todoist_client
-
-    try:
-        logger.info(f"Completing task matching: {task_name}")
-
-        # First, search for the task
-        tasks = todoist_client.get_tasks()
-        matching_task = None
-
-        for task in tasks:
-            if task_name.lower() in task.content.lower():
-                matching_task = task
-                break
-
-        if not matching_task:
-            logger.warning(f"No task found matching: {task_name}")
-            return f"Could not find a task matching \"{task_name}\""
-
-        # Complete the task
-        is_success = todoist_client.close_task(task_id=matching_task.id)
-
-        if is_success:
-            logger.info(f"Task completed successfully: {matching_task.id}")
-            return f"Successfully completed task: \"{matching_task.content}\""
-        else:
-            logger.warning(f"Task completion failed for task ID: {matching_task.id}")
-            return "Task completion failed"
-    except Exception as error:
-        logger.error(f"Error completing task: {error}")
-        return f"Error completing task: {str(error)}"

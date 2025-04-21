@@ -66,8 +66,8 @@ As of 2025-04-20,
   - `todoist_create_task`
   - `todoist_get_tasks`
   - `todoist_update_task`
+  - `todoist_close_task`
   - `todoist_delete_task`
-  - `todoist_complete_task`
 
 ## License
 
