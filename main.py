@@ -33,6 +33,9 @@ from src.tasks import (
     todoist_reopen_task,
     todoist_delete_task,
 )
+from src.tasks_sync import (
+    todoist_move_task,
+)
 
 # Setup logging
 logging.basicConfig(
@@ -83,6 +86,7 @@ mcp.tool()(todoist_update_task)
 mcp.tool()(todoist_close_task)
 mcp.tool()(todoist_reopen_task)
 mcp.tool()(todoist_delete_task)
+mcp.tool()(todoist_move_task)
 
 # Run the server
 if __name__ == "__main__":
