@@ -48,7 +48,7 @@ To see currently available tools, run
 ggrep -Po '(?<=^mcp.tool\(\)\()([^)]+)' main.py
 ```
 
-As of 2025-04-21,
+As of 2025-04-25,
 
 - Projects
   - `todoist_get_projects`
@@ -67,6 +67,7 @@ As of 2025-04-21,
   - `todoist_get_tasks`
   - `todoist_get_task`
   - `todoist_update_task`
+  - `todoist_move_task`
   - `todoist_close_task`
   - `todoist_reopen_task`
   - `todoist_delete_task`
