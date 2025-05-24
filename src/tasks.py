@@ -103,46 +103,67 @@ def todoist_get_tasks(
     project_id: Optional[str] = None,
     filter: Optional[str] = None,
     priority: Optional[int] = None,
-    limit: int = 10
+    limit: int = 50
 ) -> str:
     """Get a list of tasks from Todoist with various filters
+
+    Examples:
+        # Get first 50 tasks (default)
+        todoist_get_tasks(ctx)
+
+        # Get first 50 of today's tasks
+        todoist_get_tasks(ctx, filter="today")
+
+        # Get all tasks in a project (up to max limit)
+        todoist_get_tasks(ctx, project_id="12345", limit=200)
 
     Args:
         project_id: Filter tasks by project ID (optional)
         filter: Natural language filter like 'today', 'tomorrow', 'next week', 'priority 1', 'overdue' (optional)
         priority: Filter by priority level (1-4) (optional)
-        limit: Maximum number of tasks to return (optional)
+        limit: Maximum number of tasks to return from the API (default: 50, max: 200).
+               For comprehensive task summaries or when getting all tasks in a project/section,
+               consider using the maximum of 200.
     """
     todoist_client = ctx.request_context.lifespan_context.todoist_client
 
     try:
         logger.info(f"Getting tasks with filter: {filter}, project_id: {project_id}, priority: {priority}, limit: {limit}")
 
-        # Create API request parameters
-        params: Dict[str, Any] = {}
+        if limit > 200:
+            logger.warning(f"Limit {limit} exceeds API maximum of 200, using 200 instead")
+            limit = 200
+        elif limit <= 0:
+            logger.warning(f"Invalid limit {limit}, using default of 50")
+            limit = 50
+
+        params: Dict[str, Any] = {"limit": limit}
         if project_id:
             params["project_id"] = project_id
         if filter:
             params["filter"] = filter
 
-        # Get tasks
         tasks = todoist_client.get_tasks(**params)
 
         # Apply additional filters that aren't supported directly by the API
+        # Note: This might reduce the number of returned tasks below the requested limit
         if priority and 1 <= priority <= 4:
+            original_count = len(tasks)
             tasks = [task for task in tasks if task.priority == priority]
+            if len(tasks) < original_count:
+                logger.info(f"Priority filter reduced results from {original_count} to {len(tasks)} tasks")
 
-        # Apply limit
-        if limit and limit > 0:
-            tasks = tasks[:limit]
-
-        # Format response
         if not tasks:
             logger.info("No tasks found matching the criteria")
             return "No tasks found matching the criteria"
 
         logger.info(f"Retrieved {len(tasks)} tasks")
+
+        if len(tasks) == limit:
+            logger.info(f"Retrieved the full limit of {limit} tasks; there may be more available.")
+
         return tasks
+
     except Exception as error:
         logger.error(f"Error getting tasks: {error}")
         return f"Error getting tasks: {str(error)}"
