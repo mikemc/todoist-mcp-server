@@ -9,7 +9,6 @@ from mcp.server.fastmcp import FastMCP
 from todoist_api_python.api import TodoistAPI
 
 from src.api import get_api_client
-# Import functions directly
 from src.projects import (
     todoist_get_projects,
     todoist_get_project,
@@ -36,48 +35,44 @@ from src.tasks import (
     todoist_delete_task,
 )
 
-# Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("todoist-mcp-server")
 
-# Create lifespan context type for type hints
 @dataclass
 class TodoistContext:
+    """Type-safe container for shared application context across MCP tool calls"""
     todoist_client: TodoistAPI
 
-# Set up lifespan context manager
 @asynccontextmanager
 async def app_lifespan(server: FastMCP) -> AsyncIterator[TodoistContext]:
-    """Manage application lifecycle with type-safe context"""
-    # Initialize Todoist client on startup
+    """Manage application lifecycle with proper resource initialization and cleanup"""
     try:
+        # Initialize API client once and share across all tool invocations for efficiency
         todoist_client = get_api_client()
         yield TodoistContext(todoist_client=todoist_client)
     finally:
-        # Any cleanup needed
+        # Placeholder for any needed cleanup - current client doesn't require explicit cleanup
         logger.info("Shutting down Todoist MCP Server")
 
-# Create an MCP server
+# Initialize MCP server with lifecycle management
 mcp = FastMCP("Todoist MCP Server", lifespan=app_lifespan)
 
-# Register project tools
+# Register all tools using decorator pattern for automatic tool discovery
 mcp.tool()(todoist_get_projects)
 mcp.tool()(todoist_get_project)
 mcp.tool()(todoist_add_project)
 mcp.tool()(todoist_update_project)
 mcp.tool()(todoist_delete_project)
 
-# Register section tools
 mcp.tool()(todoist_get_sections)
 mcp.tool()(todoist_get_section)
 mcp.tool()(todoist_add_section)
 mcp.tool()(todoist_update_section)
 mcp.tool()(todoist_delete_section)
 
-# Register task tools
 mcp.tool()(todoist_get_task)
 mcp.tool()(todoist_get_tasks)
 mcp.tool()(todoist_filter_tasks)
@@ -88,8 +83,7 @@ mcp.tool()(todoist_uncomplete_task)
 mcp.tool()(todoist_move_task)
 mcp.tool()(todoist_delete_task)
 
-# Run the server
 if __name__ == "__main__":
     logger.info("Starting Todoist MCP Server")
-    # Run with stdio transport
+    # Use stdio transport for Claude Desktop integration
     mcp.run(transport='stdio')

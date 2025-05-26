@@ -52,10 +52,9 @@ def todoist_add_task(
     try:
         logger.info(f"Creating task: {content}")
 
-        # Start with required parameters
         task_params = {"content": content}
 
-        # Add all optional parameters in a cleaner way
+        # Efficiently filter out None values to avoid sending unnecessary API parameters
         optional_params = {
             "description": description,
             "project_id": project_id,
@@ -69,12 +68,11 @@ def todoist_add_task(
             "deadline_lang": deadline_lang,
         }
 
-        # Add non-null parameters to task_params
         for key, value in optional_params.items():
             if value is not None:
                 task_params[key] = value
 
-        # Handle date/datetime conversion - new API expects date/datetime objects
+        # Transform string dates to objects since v3 API expects proper date/datetime types
         if due_date is not None:
             from datetime import date
             if isinstance(due_date, str):
@@ -85,7 +83,7 @@ def todoist_add_task(
         if due_datetime is not None:
             from datetime import datetime
             if isinstance(due_datetime, str):
-                # Handle RFC3339 format
+                # Normalize RFC3339 format to Python's expected format
                 if due_datetime.endswith('Z'):
                     due_datetime = due_datetime[:-1] + '+00:00'
                 task_params["due_datetime"] = datetime.fromisoformat(due_datetime)
@@ -99,11 +97,11 @@ def todoist_add_task(
             else:
                 task_params["deadline_date"] = deadline_date
 
-        # Special handling for priority (must be 1-4)
+        # Validate priority bounds to prevent API errors
         if priority is not None and 1 <= priority <= 4:
             task_params["priority"] = priority
 
-        # Special handling for duration (must have both duration and unit)
+        # Duration requires both values to be meaningful - enforce this constraint
         if duration is not None and duration_unit is not None:
             if duration > 0 and duration_unit in ["minute", "day"]:
                 task_params["duration"] = duration
@@ -111,7 +109,6 @@ def todoist_add_task(
             else:
                 logger.warning("Invalid duration parameters: duration must be > 0 and unit must be 'minute' or 'day'")
 
-        # Create the task - method name is still add_task
         task = todoist_client.add_task(**task_params)
 
         logger.info(f"Task created successfully: {task.id}")
@@ -168,6 +165,7 @@ def todoist_get_tasks(
     try:
         logger.info(f"Getting tasks with project_id: {project_id}, section_id: {section_id}, parent_id: {parent_id}, label: {label}, limit: {limit}")
 
+        # Enforce API limits to prevent errors and excessive resource usage
         if limit > 200:
             logger.warning(f"Limit {limit} exceeds API maximum of 200, using 200 instead")
             limit = 200
@@ -189,7 +187,7 @@ def todoist_get_tasks(
         if limit:
             params["limit"] = limit
 
-        # New API returns Iterator[list[Task]] - we need to iterate through pages
+        # Handle paginated results by consuming the iterator until we hit our limit or exhaust results
         tasks_iterator = todoist_client.get_tasks(**params)
         all_tasks = []
         total_fetched = 0
@@ -198,12 +196,12 @@ def todoist_get_tasks(
             all_tasks.extend(task_batch)
             total_fetched += len(task_batch)
 
-            # Stop if we've reached our max
+            # Respect user-imposed limits to avoid overwhelming responses
             if nmax is not None and total_fetched >= nmax:
                 all_tasks = all_tasks[:nmax]
                 break
 
-            # Stop if we got less than the limit (last page)
+            # Detect end of results when API returns partial batch
             if len(task_batch) < limit:
                 break
 
@@ -244,6 +242,7 @@ def todoist_filter_tasks(
     try:
         logger.info(f"Filtering tasks with filter: {filter}, lang: {lang}, limit: {limit}")
 
+        # Enforce same pagination strategy as get_tasks for consistency
         if limit > 200:
             logger.warning(f"Limit {limit} exceeds API maximum of 200, using 200 instead")
             limit = 200
@@ -257,7 +256,6 @@ def todoist_filter_tasks(
         if limit:
             params["limit"] = limit
 
-        # New API returns Iterator[list[Task]]
         tasks_iterator = todoist_client.filter_tasks(**params)
         all_tasks = []
         total_fetched = 0
@@ -266,12 +264,10 @@ def todoist_filter_tasks(
             all_tasks.extend(task_batch)
             total_fetched += len(task_batch)
 
-            # Stop if we've reached our max
             if nmax is not None and total_fetched >= nmax:
                 all_tasks = all_tasks[:nmax]
                 break
 
-            # Stop if we got less than the limit (last page)
             if len(task_batch) < limit:
                 break
 
@@ -298,7 +294,6 @@ def todoist_get_task(ctx: Context, task_id: str) -> str:
     try:
         logger.info(f"Getting task with ID: {task_id}")
 
-        # Get the task
         task = todoist_client.get_task(task_id=task_id)
 
         if not task:
@@ -351,7 +346,7 @@ def todoist_update_task(
     try:
         logger.info(f"Updating task with ID: {task_id}")
 
-        # First, get the task to verify it exists
+        # Verify task exists before attempting update to provide better error messages
         try:
             task = todoist_client.get_task(task_id=task_id)
             original_content = task.content
@@ -359,10 +354,9 @@ def todoist_update_task(
             logger.warning(f"Error getting task with ID: {task_id}: {error}")
             return f"Could not verify task with ID: {task_id}. Update aborted."
 
-        # Build update data
         update_data = {}
 
-        # Define all updateable parameters
+        # Apply same parameter filtering strategy as create
         optional_params = {
             "content": content,
             "description": description,
@@ -373,12 +367,11 @@ def todoist_update_task(
             "deadline_lang": deadline_lang,
         }
 
-        # Add non-null parameters to update_data
         for key, value in optional_params.items():
             if value is not None:
                 update_data[key] = value
 
-        # Handle date/datetime conversion - new API expects date/datetime objects
+        # Apply same date transformation logic as create for consistency
         if due_date is not None:
             from datetime import date
             if isinstance(due_date, str):
@@ -389,7 +382,6 @@ def todoist_update_task(
         if due_datetime is not None:
             from datetime import datetime
             if isinstance(due_datetime, str):
-                # Handle RFC3339 format
                 if due_datetime.endswith('Z'):
                     due_datetime = due_datetime[:-1] + '+00:00'
                 update_data["due_datetime"] = datetime.fromisoformat(due_datetime)
@@ -403,11 +395,9 @@ def todoist_update_task(
             else:
                 update_data["deadline_date"] = deadline_date
 
-        # Special handling for priority (must be 1-4)
         if priority is not None and 1 <= priority <= 4:
             update_data["priority"] = priority
 
-        # Special handling for duration (must have both duration and unit)
         if duration is not None and duration_unit is not None:
             if duration > 0 and duration_unit in ["minute", "day"]:
                 update_data["duration"] = duration
@@ -418,7 +408,6 @@ def todoist_update_task(
         if len(update_data) == 0:
             return f"No update parameters provided for task: {original_content} (ID: {task_id})"
 
-        # Update the task
         updated_task = todoist_client.update_task(task_id, **update_data)
 
         logger.info(f"Task updated successfully: {task_id}")
@@ -440,7 +429,7 @@ def todoist_complete_task(ctx: Context, task_id: str) -> str:
     try:
         logger.info(f"Closing task with ID: {task_id}")
 
-        # First, verify the task exists
+        # Pre-fetch task content for meaningful success messages
         try:
             task = todoist_client.get_task(task_id=task_id)
             task_content = task.content
@@ -448,7 +437,6 @@ def todoist_complete_task(ctx: Context, task_id: str) -> str:
             logger.warning(f"Error getting task with ID: {task_id}: {error}")
             return f"Could not verify task with ID: {task_id}. Task closing aborted."
 
-        # Method name changed: close_task -> complete_task
         is_success = todoist_client.complete_task(task_id=task_id)
 
         logger.info(f"Task closed successfully: {task_id}")
@@ -468,7 +456,6 @@ def todoist_uncomplete_task(ctx: Context, task_id: str) -> str:
     try:
         logger.info(f"Reopening task with ID: {task_id}")
 
-        # First, verify the task exists
         try:
             task = todoist_client.get_task(task_id=task_id)
             task_content = task.content
@@ -476,7 +463,6 @@ def todoist_uncomplete_task(ctx: Context, task_id: str) -> str:
             logger.warning(f"Error getting task with ID: {task_id}: {error}")
             return f"Could not verify task with ID: {task_id}. Task reopening aborted."
 
-        # Method name changed: reopen_task -> uncomplete_task
         is_success = todoist_client.uncomplete_task(task_id=task_id)
 
         logger.info(f"Task reopened successfully: {task_id}")
@@ -507,7 +493,6 @@ def todoist_move_task(
     try:
         logger.info(f"Moving task with ID: {task_id}")
 
-        # Verify the task exists first
         try:
             task = todoist_client.get_task(task_id=task_id)
             task_content = task.content
@@ -515,13 +500,12 @@ def todoist_move_task(
             logger.warning(f"Error getting task with ID: {task_id}: {error}")
             return f"Could not verify task with ID: {task_id}. Task move aborted."
 
-        # Count how many destination parameters are set
+        # Validate exclusive destination constraint - API requirement
         destination_count = sum(1 for x in [parent_id, section_id, project_id] if x is not None)
 
         if destination_count != 1:
             return "Error: Exactly one of parent_id, section_id, or project_id must be specified"
 
-        # Use the new native move_task method - much simpler than sync API!
         is_success = todoist_client.move_task(
             task_id=task_id,
             parent_id=parent_id,
@@ -552,7 +536,6 @@ def todoist_delete_task(ctx: Context, task_id: str) -> str:
     try:
         logger.info(f"Deleting task with ID: {task_id}")
 
-        # First, verify the task exists
         try:
             task = todoist_client.get_task(task_id=task_id)
             task_content = task.content
@@ -560,7 +543,6 @@ def todoist_delete_task(ctx: Context, task_id: str) -> str:
             logger.warning(f"Error getting task with ID: {task_id}: {error}")
             return f"Could not verify task with ID: {task_id}. Deletion aborted."
 
-        # Delete the task
         is_success = todoist_client.delete_task(task_id=task_id)
 
         logger.info(f"Task deleted successfully: {task_id}")

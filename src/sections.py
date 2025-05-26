@@ -17,14 +17,13 @@ def todoist_get_sections(ctx: Context, project_id: Optional[str] = None) -> str:
     try:
         logger.info(f"Getting sections{' for project ID: ' + project_id if project_id else ''}")
 
-        # New API returns Iterator[list[Section]] - we need to iterate through pages
+        # Use same pagination pattern as projects for consistency
         sections_iterator = todoist_client.get_sections(project_id=project_id)
         all_sections = []
 
         for section_batch in sections_iterator:
             all_sections.extend(section_batch)
-            # If we got less than the limit, this is the last page
-            if len(section_batch) < 200:  # API default limit
+            if len(section_batch) < 200:
                 break
 
         if not all_sections:
@@ -48,7 +47,6 @@ def todoist_get_section(ctx: Context, section_id: str) -> str:
     try:
         logger.info(f"Getting section with ID: {section_id}")
 
-        # Get the section
         section = todoist_client.get_section(section_id=section_id)
 
         if not section:
@@ -79,17 +77,14 @@ def todoist_add_section(
     try:
         logger.info(f"Creating section '{name}' in project ID: {project_id}")
 
-        # Create section parameters
         section_params = {
             "name": name,
             "project_id": project_id
         }
 
-        # Add optional parameters if provided
         if order is not None:
             section_params["order"] = order
 
-        # Create the section
         section = todoist_client.add_section(**section_params)
 
         logger.info(f"Section created successfully: {section.id}")
@@ -110,6 +105,7 @@ def todoist_update_section(ctx: Context, section_id: str, name: str) -> str:
     try:
         logger.info(f"Updating section with ID: {section_id}")
 
+        # Capture original name for informative response messages
         try:
             section = todoist_client.get_section(section_id=section_id)
             original_name = section.name
@@ -117,7 +113,6 @@ def todoist_update_section(ctx: Context, section_id: str, name: str) -> str:
             logger.warning(f"Error getting section with ID: {section_id}: {error}")
             return f"Could not verify section with ID: {section_id}. Update aborted."
 
-        # Update the section
         updated_section = todoist_client.update_section(section_id=section_id, name=name)
 
         logger.info(f"Section updated successfully: {section_id}")
@@ -144,9 +139,8 @@ def todoist_delete_section(ctx: Context, section_id: str) -> str:
             section_name = section.name
         except Exception as error:
             logger.warning(f"Error getting section with ID: {section_id}: {error}")
-            return f"Could not verify section with ID: {section_id}. Update aborted."
+            return f"Could not verify section with ID: {section_id}. Deletion aborted."
 
-        # Delete the section
         is_success = todoist_client.delete_section(section_id=section_id)
 
         logger.info(f"Section deleted successfully: {section_id}")

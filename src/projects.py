@@ -14,14 +14,14 @@ def todoist_get_projects(ctx: Context) -> str:
     try:
         logger.info("Getting all projects")
 
-        # New API returns Iterator[list[Project]] - we need to iterate through pages
+        # Consume iterator to flatten paginated results into single list
         projects_iterator = todoist_client.get_projects()
         all_projects = []
 
         for project_batch in projects_iterator:
             all_projects.extend(project_batch)
-            # If we got less than the limit, this is the last page
-            if len(project_batch) < 200:  # API default limit
+            # Break early when partial batch indicates end of results
+            if len(project_batch) < 200:
                 break
 
         if not all_projects:
@@ -45,7 +45,6 @@ def todoist_get_project(ctx: Context, project_id: str) -> str:
     try:
         logger.info(f"Getting project with ID: {project_id}")
 
-        # Get the project
         project = todoist_client.get_project(project_id=project_id)
 
         if not project:
@@ -80,22 +79,21 @@ def todoist_add_project(
     try:
         logger.info(f"Creating project: {name}")
 
-        # Create project parameters
         project_params = {
             "name": name
         }
 
-        # Add optional parameters if provided
+        # Add optional parameters efficiently
         if color:
             project_params["color"] = color
         if parent_id:
             project_params["parent_id"] = parent_id
         if is_favorite is not None:
             project_params["is_favorite"] = is_favorite
-        if view_style and view_style in ["list", "board", "calendar"]:  # Added calendar support
+        # Validate view_style against API-supported values to prevent errors
+        if view_style and view_style in ["list", "board", "calendar"]:
             project_params["view_style"] = view_style
 
-        # Create the project
         project = todoist_client.add_project(**project_params)
 
         logger.info(f"Project created successfully: {project.id}")
@@ -126,6 +124,7 @@ def todoist_update_project(
     try:
         logger.info(f"Updating project with ID: {project_id}")
 
+        # Pre-fetch for validation and meaningful error messages
         try:
             project = todoist_client.get_project(project_id=project_id)
             original_name = project.name
@@ -133,7 +132,6 @@ def todoist_update_project(
             logger.warning(f"Error getting project with ID: {project_id}: {error}")
             return f"Could not verify project with ID: {project_id}. Update aborted."
 
-        # Build update parameters to pass to todoist API call
         update_params = {}
         if name:
             update_params["name"] = name
@@ -141,7 +139,8 @@ def todoist_update_project(
             update_params["color"] = color
         if is_favorite is not None:
             update_params["is_favorite"] = is_favorite
-        if view_style and view_style in ["list", "board", "calendar"]:  # Added calendar support
+        # Same validation as create to maintain consistency
+        if view_style and view_style in ["list", "board", "calendar"]:
             update_params["view_style"] = view_style
 
         if len(update_params) == 0:
@@ -168,6 +167,7 @@ def todoist_delete_project(ctx: Context, project_id: str) -> str:
     try:
         logger.info(f"Deleting project with ID: {project_id}")
 
+        # Capture project name for meaningful success/failure messages
         try:
             project = todoist_client.get_project(project_id=project_id)
             project_name = project.name

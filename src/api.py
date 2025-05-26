@@ -4,7 +4,6 @@ import os
 import logging
 from todoist_api_python.api import TodoistAPI
 
-# Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -22,14 +21,14 @@ def get_api_client():
         ValueError: If TODOIST_API_TOKEN environment variable is not set
         Exception: If client initialization fails
     """
-    # Check for API token
+    # Fail fast on missing credentials to provide clear setup guidance
     TODOIST_API_TOKEN = os.getenv("TODOIST_API_TOKEN")
     if not TODOIST_API_TOKEN:
         logger.error("TODOIST_API_TOKEN environment variable is required")
         raise ValueError("TODOIST_API_TOKEN environment variable is required")
 
-    # Initialize Todoist client
     try:
+        # Create client instance - authentication is validated on first API call
         todoist_client = TodoistAPI(TODOIST_API_TOKEN)
         logger.info("Todoist API client initialized successfully")
         return todoist_client
