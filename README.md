@@ -18,18 +18,37 @@ A Todoist MCP server written in Python, using the [Todoist Python API](https://d
 
 ### Configuration with Claude Desktop
 
-Add to your claude_desktop_config.json:
+Add the MCP server to your claude_desktop_config.json,
 
 ```json
 {
   "mcpServers": {
     "todoist": {
-      "command": "uv",
+      "command": "uvx",
       "args": [
-        "--directory",
+        "--from",
+        "git+https://github.com/mikemc/todoist-mcp-server",
+        "todoist-mcp"
+      ],
+      "env": {
+        "TODOIST_API_TOKEN": "your_todoist_api_token"
+      }
+    }
+  }
+}
+```
+
+Or, to run from a local copy,
+
+```json
+{
+  "mcpServers": {
+    "todoist": {
+      "command": "uvx",
+      "args": [
+        "--from",
         "/absolute/path/to/todoist-mcp-server",
-        "run",
-        "main.py"
+        "todoist-mcp"
       ],
       "env": {
         "TODOIST_API_TOKEN": "your_todoist_api_token"
@@ -45,7 +64,7 @@ To see currently available tools, run
 
 ```sh
 # With GNU grep installed as ggrep (as with `brew install grep` on Mac)
-ggrep -Po '(?<=^mcp.tool\(\)\()([^)]+)' main.py
+ggrep -Po '(?<=^mcp.tool\(\)\()([^)]+)' src/main.py
 ```
 
 As of 2025-05-26,

@@ -8,22 +8,22 @@ from dataclasses import dataclass
 from mcp.server.fastmcp import FastMCP
 from todoist_api_python.api import TodoistAPI
 
-from src.api import get_api_client
-from src.projects import (
+from .api import get_api_client
+from .projects import (
     todoist_get_projects,
     todoist_get_project,
     todoist_add_project,
     todoist_update_project,
     todoist_delete_project,
 )
-from src.sections import (
+from .sections import (
     todoist_get_sections,
     todoist_get_section,
     todoist_add_section,
     todoist_update_section,
     todoist_delete_section,
 )
-from src.tasks import (
+from .tasks import (
     todoist_get_task,
     todoist_get_tasks,
     todoist_filter_tasks,
@@ -83,7 +83,10 @@ mcp.tool()(todoist_uncomplete_task)
 mcp.tool()(todoist_move_task)
 mcp.tool()(todoist_delete_task)
 
-if __name__ == "__main__":
+def main():
     logger.info("Starting Todoist MCP Server")
     # Use stdio transport for Claude Desktop integration
     mcp.run(transport='stdio')
+
+if __name__ == "__main__":
+    main()

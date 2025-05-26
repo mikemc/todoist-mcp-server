@@ -1,1 +1,1 @@
-# src package
+"""Todoist MCP Server package."""
