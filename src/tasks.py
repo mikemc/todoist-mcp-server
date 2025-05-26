@@ -163,15 +163,29 @@ def todoist_get_tasks(
     todoist_client = ctx.request_context.lifespan_context.todoist_client
 
     try:
-        logger.info(f"Getting tasks with project_id: {project_id}, section_id: {section_id}, parent_id: {parent_id}, label: {label}, limit: {limit}")
+        logger.info(f"Getting tasks with project_id: {project_id}, section_id: {section_id}, parent_id: {parent_id}, label: {label}, nmax: {nmax}, limit: {limit}")
 
-        # Enforce API limits to prevent errors and excessive resource usage
+        # Early exit for zero requests to avoid unnecessary API calls
+        if nmax is not None:
+            if nmax == 0:
+                logger.info("nmax=0 specified, returning empty result")
+                return []
+            elif nmax < 0:
+                logger.warning(f"Invalid nmax {nmax}, using default of 100")
+                nmax = 100
+
         if limit > 200:
             logger.warning(f"Limit {limit} exceeds API maximum of 200, using 200 instead")
             limit = 200
         elif limit <= 0:
             logger.warning(f"Invalid limit {limit}, using default of 200")
             limit = 200
+
+        # Key optimization: match page size to actual need to reduce API payload
+        effective_limit = limit
+        if nmax is not None and nmax < limit:
+            effective_limit = nmax
+            logger.info(f"Optimized limit from {limit} to {effective_limit} to match nmax")
 
         params = {}
         if project_id:
@@ -184,35 +198,39 @@ def todoist_get_tasks(
             params["label"] = label
         if ids:
             params["ids"] = ids
-        if limit:
-            params["limit"] = limit
+        params["limit"] = effective_limit
 
-        # Handle paginated results by consuming the iterator until we hit our limit or exhaust results
         tasks_iterator = todoist_client.get_tasks(**params)
         all_tasks = []
-        total_fetched = 0
+        pages_fetched = 0
 
         for task_batch in tasks_iterator:
+            pages_fetched += 1
             all_tasks.extend(task_batch)
-            total_fetched += len(task_batch)
 
-            # Respect user-imposed limits to avoid overwhelming responses
-            if nmax is not None and total_fetched >= nmax:
+            logger.info(f"Fetched page {pages_fetched} with {len(task_batch)} tasks (total: {len(all_tasks)})")
+
+            if nmax is not None and len(all_tasks) >= nmax:
+                # Trim excess - rare due to effective_limit optimization, but handles edge cases
                 all_tasks = all_tasks[:nmax]
+                logger.info(f"Reached nmax of {nmax} tasks, stopping pagination")
                 break
 
-            # Detect end of results when API returns partial batch
-            if len(task_batch) < limit:
+            # Todoist API signals end of results by returning fewer items than requested
+            if len(task_batch) < effective_limit:
+                logger.info(f"Received {len(task_batch)} tasks (less than limit {effective_limit}), reached end of results")
                 break
 
         if not all_tasks:
             logger.info("No tasks found matching the criteria")
             return "No tasks found matching the criteria"
 
-        logger.info(f"Retrieved {len(all_tasks)} tasks")
+        logger.info(f"Retrieved {len(all_tasks)} tasks total across {pages_fetched} pages")
 
-        if nmax is not None and len(all_tasks) == nmax:
-            logger.info(f"Retrieved the full limit of {nmax} tasks; there may be more available.")
+        if nmax is None:
+            logger.info("Fetched ALL matching tasks (nmax=None specified)")
+        elif len(all_tasks) == nmax:
+            logger.info(f"Retrieved exactly the requested {nmax} tasks")
 
         return all_tasks
 
@@ -240,9 +258,17 @@ def todoist_filter_tasks(
     todoist_client = ctx.request_context.lifespan_context.todoist_client
 
     try:
-        logger.info(f"Filtering tasks with filter: {filter}, lang: {lang}, limit: {limit}")
+        logger.info(f"Filtering tasks with filter: '{filter}', lang: {lang}, nmax: {nmax}, limit: {limit}")
 
-        # Enforce same pagination strategy as get_tasks for consistency
+        # Early exit for zero requests to avoid unnecessary API calls
+        if nmax is not None:
+            if nmax == 0:
+                logger.info("nmax=0 specified, returning empty result")
+                return []
+            elif nmax < 0:
+                logger.warning(f"Invalid nmax {nmax}, using default of 100")
+                nmax = 100
+
         if limit > 200:
             logger.warning(f"Limit {limit} exceeds API maximum of 200, using 200 instead")
             limit = 200
@@ -250,32 +276,48 @@ def todoist_filter_tasks(
             logger.warning(f"Invalid limit {limit}, using default of 200")
             limit = 200
 
+        # Key optimization: match page size to actual need to reduce API payload
+        effective_limit = limit
+        if nmax is not None and nmax < limit:
+            effective_limit = nmax
+            logger.info(f"Optimized limit from {limit} to {effective_limit} to match nmax")
+
         params = {"query": filter}
         if lang:
             params["lang"] = lang
-        if limit:
-            params["limit"] = limit
+        params["limit"] = effective_limit
 
         tasks_iterator = todoist_client.filter_tasks(**params)
         all_tasks = []
-        total_fetched = 0
+        pages_fetched = 0
 
         for task_batch in tasks_iterator:
+            pages_fetched += 1
             all_tasks.extend(task_batch)
-            total_fetched += len(task_batch)
 
-            if nmax is not None and total_fetched >= nmax:
+            logger.info(f"Fetched page {pages_fetched} with {len(task_batch)} tasks (total: {len(all_tasks)})")
+
+            if nmax is not None and len(all_tasks) >= nmax:
+                # Trim excess - rare due to effective_limit optimization, but handles edge cases
                 all_tasks = all_tasks[:nmax]
+                logger.info(f"Reached nmax of {nmax} tasks, stopping pagination")
                 break
 
-            if len(task_batch) < limit:
+            # Todoist API signals end of results by returning fewer items than requested
+            if len(task_batch) < effective_limit:
+                logger.info(f"Received {len(task_batch)} tasks (less than limit {effective_limit}), reached end of results")
                 break
 
         if not all_tasks:
             logger.info("No tasks found matching the filter")
             return "No tasks found matching the filter"
 
-        logger.info(f"Retrieved {len(all_tasks)} tasks")
+        logger.info(f"Retrieved {len(all_tasks)} tasks total across {pages_fetched} pages")
+
+        if nmax is None:
+            logger.info("Fetched ALL matching tasks (nmax=None specified)")
+        elif len(all_tasks) == nmax:
+            logger.info(f"Retrieved exactly the requested {nmax} tasks")
 
         return all_tasks
 
