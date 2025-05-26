@@ -9,3 +9,9 @@ dependencies = [
     "todoist-api-python>=3.1.0,<4",
 ]
 license = "MIT"
+
+[project.scripts]
+todoist-mcp = "main:main"
+
+[tool.uv]
+package = true
