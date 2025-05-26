@@ -88,8 +88,12 @@ mcp.tool()(todoist_reopen_task)
 mcp.tool()(todoist_delete_task)
 mcp.tool()(todoist_move_task)
 
-# Run the server
-if __name__ == "__main__":
+
+def main():
     logger.info("Starting Todoist MCP Server")
     # Run with stdio transport
     mcp.run(transport='stdio')
+
+# Run the server
+if __name__ == "__main__":
+    main()
