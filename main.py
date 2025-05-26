@@ -25,16 +25,15 @@ from src.sections import (
     todoist_delete_section,
 )
 from src.tasks import (
-    todoist_create_task,
-    todoist_get_tasks,
     todoist_get_task,
+    todoist_get_tasks,
+    todoist_filter_tasks,
+    todoist_add_task,
     todoist_update_task,
-    todoist_close_task,
-    todoist_reopen_task,
-    todoist_delete_task,
-)
-from src.tasks_sync import (
+    todoist_complete_task,
+    todoist_uncomplete_task,
     todoist_move_task,
+    todoist_delete_task,
 )
 
 # Setup logging
@@ -79,14 +78,15 @@ mcp.tool()(todoist_update_section)
 mcp.tool()(todoist_delete_section)
 
 # Register task tools
-mcp.tool()(todoist_get_tasks)
 mcp.tool()(todoist_get_task)
-mcp.tool()(todoist_create_task)
+mcp.tool()(todoist_get_tasks)
+mcp.tool()(todoist_filter_tasks)
+mcp.tool()(todoist_add_task)
 mcp.tool()(todoist_update_task)
-mcp.tool()(todoist_close_task)
-mcp.tool()(todoist_reopen_task)
-mcp.tool()(todoist_delete_task)
+mcp.tool()(todoist_complete_task)
+mcp.tool()(todoist_uncomplete_task)
 mcp.tool()(todoist_move_task)
+mcp.tool()(todoist_delete_task)
 
 # Run the server
 if __name__ == "__main__":

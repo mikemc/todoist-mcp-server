@@ -6,6 +6,6 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "mcp[cli]>=1.6.0",
-    "todoist-api-python>=2.1.7",
+    "todoist-api-python>=3.1.0,<4",
 ]
 license = "MIT"

@@ -6,7 +6,7 @@ from mcp.server.fastmcp import Context
 
 logger = logging.getLogger("todoist-mcp-server")
 
-def todoist_create_task(
+def todoist_add_task(
     ctx: Context,
     content: str,
     description: Optional[str] = None,
@@ -65,10 +65,7 @@ def todoist_create_task(
             "labels": labels,
             "assignee_id": assignee_id,
             "due_string": due_string,
-            "due_date": due_date,
-            "due_datetime": due_datetime,
             "due_lang": due_lang,
-            "deadline_date": deadline_date,
             "deadline_lang": deadline_lang,
         }
 
@@ -76,6 +73,31 @@ def todoist_create_task(
         for key, value in optional_params.items():
             if value is not None:
                 task_params[key] = value
+
+        # Handle date/datetime conversion - new API expects date/datetime objects
+        if due_date is not None:
+            from datetime import date
+            if isinstance(due_date, str):
+                task_params["due_date"] = date.fromisoformat(due_date)
+            else:
+                task_params["due_date"] = due_date
+
+        if due_datetime is not None:
+            from datetime import datetime
+            if isinstance(due_datetime, str):
+                # Handle RFC3339 format
+                if due_datetime.endswith('Z'):
+                    due_datetime = due_datetime[:-1] + '+00:00'
+                task_params["due_datetime"] = datetime.fromisoformat(due_datetime)
+            else:
+                task_params["due_datetime"] = due_datetime
+
+        if deadline_date is not None:
+            from datetime import date
+            if isinstance(deadline_date, str):
+                task_params["deadline_date"] = date.fromisoformat(deadline_date)
+            else:
+                task_params["deadline_date"] = deadline_date
 
         # Special handling for priority (must be 1-4)
         if priority is not None and 1 <= priority <= 4:
@@ -89,7 +111,7 @@ def todoist_create_task(
             else:
                 logger.warning("Invalid duration parameters: duration must be > 0 and unit must be 'minute' or 'day'")
 
-        # Create the task
+        # Create the task - method name is still add_task
         task = todoist_client.add_task(**task_params)
 
         logger.info(f"Task created successfully: {task.id}")
@@ -101,72 +123,169 @@ def todoist_create_task(
 def todoist_get_tasks(
     ctx: Context,
     project_id: Optional[str] = None,
-    filter: Optional[str] = None,
-    priority: Optional[int] = None,
-    limit: int = 50
+    section_id: Optional[str] = None,
+    parent_id: Optional[str] = None,
+    label: Optional[str] = None,
+    ids: Optional[list[str]] = None,
+    nmax: Optional[int] = 100,
+    limit: int = 200
 ) -> str:
-    """Get a list of tasks from Todoist with various filters
+    """Get a list of tasks from Todoist with basic filters
+
+    This is a wrapper around the Todoist API's get_tasks method that handles pagination
+    automatically. By default, it will fetch up to 100 matching tasks. Set nmax=None
+    to fetch ALL matching tasks across multiple API calls.
+
+    For natural language filtering (like 'today', 'overdue'), use todoist_filter_tasks instead.
 
     Examples:
-        # Get first 50 tasks (default)
+        # Get up to 100 tasks (default)
         todoist_get_tasks(ctx)
 
-        # Get first 50 of today's tasks
-        todoist_get_tasks(ctx, filter="today")
+        # Get all tasks in a project (up to 100 by default)
+        todoist_get_tasks(ctx, project_id="12345")
 
-        # Get all tasks in a project (up to max limit)
-        todoist_get_tasks(ctx, project_id="12345", limit=200)
+        # Get first 500 tasks total
+        todoist_get_tasks(ctx, nmax=500)
+
+        # Get ALL tasks (unlimited)
+        todoist_get_tasks(ctx, nmax=None)
+
+        # Get specific tasks by ID
+        todoist_get_tasks(ctx, ids=["task1", "task2", "task3"])
 
     Args:
         project_id: Filter tasks by project ID (optional)
-        filter: Natural language filter like 'today', 'tomorrow', 'next week', 'priority 1', 'overdue' (optional)
-        priority: Filter by priority level (1-4) (optional)
-        limit: Maximum number of tasks to return from the API (default: 50, max: 200).
-               For comprehensive task summaries or when getting all tasks in a project/section,
-               consider using the maximum of 200.
+        section_id: Filter tasks by section ID (optional)
+        parent_id: Filter tasks by parent task ID (optional)
+        label: Filter tasks by label name (optional)
+        ids: A list of the IDs of the tasks to retrieve (optional)
+        nmax: Maximum total number of tasks to return. Set to None for ALL matching tasks (default: 100)
+        limit: Number of tasks to fetch per API request (default: 200, max: 200)
     """
     todoist_client = ctx.request_context.lifespan_context.todoist_client
 
     try:
-        logger.info(f"Getting tasks with filter: {filter}, project_id: {project_id}, priority: {priority}, limit: {limit}")
+        logger.info(f"Getting tasks with project_id: {project_id}, section_id: {section_id}, parent_id: {parent_id}, label: {label}, limit: {limit}")
 
         if limit > 200:
             logger.warning(f"Limit {limit} exceeds API maximum of 200, using 200 instead")
             limit = 200
         elif limit <= 0:
-            logger.warning(f"Invalid limit {limit}, using default of 50")
-            limit = 50
+            logger.warning(f"Invalid limit {limit}, using default of 200")
+            limit = 200
 
-        params: Dict[str, Any] = {"limit": limit}
+        params = {}
         if project_id:
             params["project_id"] = project_id
-        if filter:
-            params["filter"] = filter
+        if section_id:
+            params["section_id"] = section_id
+        if parent_id:
+            params["parent_id"] = parent_id
+        if label:
+            params["label"] = label
+        if ids:
+            params["ids"] = ids
+        if limit:
+            params["limit"] = limit
 
-        tasks = todoist_client.get_tasks(**params)
+        # New API returns Iterator[list[Task]] - we need to iterate through pages
+        tasks_iterator = todoist_client.get_tasks(**params)
+        all_tasks = []
+        total_fetched = 0
 
-        # Apply additional filters that aren't supported directly by the API
-        # Note: This might reduce the number of returned tasks below the requested limit
-        if priority and 1 <= priority <= 4:
-            original_count = len(tasks)
-            tasks = [task for task in tasks if task.priority == priority]
-            if len(tasks) < original_count:
-                logger.info(f"Priority filter reduced results from {original_count} to {len(tasks)} tasks")
+        for task_batch in tasks_iterator:
+            all_tasks.extend(task_batch)
+            total_fetched += len(task_batch)
 
-        if not tasks:
+            # Stop if we've reached our max
+            if nmax is not None and total_fetched >= nmax:
+                all_tasks = all_tasks[:nmax]
+                break
+
+            # Stop if we got less than the limit (last page)
+            if len(task_batch) < limit:
+                break
+
+        if not all_tasks:
             logger.info("No tasks found matching the criteria")
             return "No tasks found matching the criteria"
 
-        logger.info(f"Retrieved {len(tasks)} tasks")
+        logger.info(f"Retrieved {len(all_tasks)} tasks")
 
-        if len(tasks) == limit:
-            logger.info(f"Retrieved the full limit of {limit} tasks; there may be more available.")
+        if nmax is not None and len(all_tasks) == nmax:
+            logger.info(f"Retrieved the full limit of {nmax} tasks; there may be more available.")
 
-        return tasks
+        return all_tasks
 
     except Exception as error:
         logger.error(f"Error getting tasks: {error}")
         return f"Error getting tasks: {str(error)}"
+
+def todoist_filter_tasks(
+    ctx: Context,
+    filter: str,
+    lang: Optional[str] = None,
+    nmax: Optional[int] = 100,
+    limit: int = 200
+) -> str:
+    """Get tasks using Todoist's natural language filter
+
+    This uses the new filter_tasks method for queries like 'today', 'overdue', 'priority 1', etc.
+
+    Args:
+        filter: Natural language filter like 'today', 'tomorrow', 'next week', 'priority 1', 'overdue'
+        lang: Language for task content (e.g., 'en') (optional)
+        nmax: Maximum total number of tasks to return. Set to None for ALL matching tasks (default: 100)
+        limit: Number of tasks to fetch per API request (default: 200, max: 200)
+    """
+    todoist_client = ctx.request_context.lifespan_context.todoist_client
+
+    try:
+        logger.info(f"Filtering tasks with filter: {filter}, lang: {lang}, limit: {limit}")
+
+        if limit > 200:
+            logger.warning(f"Limit {limit} exceeds API maximum of 200, using 200 instead")
+            limit = 200
+        elif limit <= 0:
+            logger.warning(f"Invalid limit {limit}, using default of 200")
+            limit = 200
+
+        params = {"query": filter}
+        if lang:
+            params["lang"] = lang
+        if limit:
+            params["limit"] = limit
+
+        # New API returns Iterator[list[Task]]
+        tasks_iterator = todoist_client.filter_tasks(**params)
+        all_tasks = []
+        total_fetched = 0
+
+        for task_batch in tasks_iterator:
+            all_tasks.extend(task_batch)
+            total_fetched += len(task_batch)
+
+            # Stop if we've reached our max
+            if nmax is not None and total_fetched >= nmax:
+                all_tasks = all_tasks[:nmax]
+                break
+
+            # Stop if we got less than the limit (last page)
+            if len(task_batch) < limit:
+                break
+
+        if not all_tasks:
+            logger.info("No tasks found matching the filter")
+            return "No tasks found matching the filter"
+
+        logger.info(f"Retrieved {len(all_tasks)} tasks")
+
+        return all_tasks
+
+    except Exception as error:
+        logger.error(f"Error filtering tasks: {error}")
+        return f"Error filtering tasks: {str(error)}"
 
 def todoist_get_task(ctx: Context, task_id: str) -> str:
     """Get an active task from Todoist
@@ -241,7 +360,7 @@ def todoist_update_task(
             return f"Could not verify task with ID: {task_id}. Update aborted."
 
         # Build update data
-        update_data = {"task_id": task_id}
+        update_data = {}
 
         # Define all updateable parameters
         optional_params = {
@@ -249,11 +368,8 @@ def todoist_update_task(
             "description": description,
             "labels": labels,
             "due_string": due_string,
-            "due_date": due_date,
-            "due_datetime": due_datetime,
             "due_lang": due_lang,
             "assignee_id": assignee_id,
-            "deadline_date": deadline_date,
             "deadline_lang": deadline_lang,
         }
 
@@ -261,6 +377,31 @@ def todoist_update_task(
         for key, value in optional_params.items():
             if value is not None:
                 update_data[key] = value
+
+        # Handle date/datetime conversion - new API expects date/datetime objects
+        if due_date is not None:
+            from datetime import date
+            if isinstance(due_date, str):
+                update_data["due_date"] = date.fromisoformat(due_date)
+            else:
+                update_data["due_date"] = due_date
+
+        if due_datetime is not None:
+            from datetime import datetime
+            if isinstance(due_datetime, str):
+                # Handle RFC3339 format
+                if due_datetime.endswith('Z'):
+                    due_datetime = due_datetime[:-1] + '+00:00'
+                update_data["due_datetime"] = datetime.fromisoformat(due_datetime)
+            else:
+                update_data["due_datetime"] = due_datetime
+
+        if deadline_date is not None:
+            from datetime import date
+            if isinstance(deadline_date, str):
+                update_data["deadline_date"] = date.fromisoformat(deadline_date)
+            else:
+                update_data["deadline_date"] = deadline_date
 
         # Special handling for priority (must be 1-4)
         if priority is not None and 1 <= priority <= 4:
@@ -274,11 +415,11 @@ def todoist_update_task(
             else:
                 logger.warning("Invalid duration parameters: duration must be > 0 and unit must be 'minute' or 'day'")
 
-        if len(update_data) <= 1:  # Only task_id
+        if len(update_data) == 0:
             return f"No update parameters provided for task: {original_content} (ID: {task_id})"
 
         # Update the task
-        updated_task = todoist_client.update_task(**update_data)
+        updated_task = todoist_client.update_task(task_id, **update_data)
 
         logger.info(f"Task updated successfully: {task_id}")
 
@@ -288,7 +429,7 @@ def todoist_update_task(
         logger.error(f"Error updating task: {error}")
         return f"Error updating task: {str(error)}"
 
-def todoist_close_task(ctx: Context, task_id: str) -> str:
+def todoist_complete_task(ctx: Context, task_id: str) -> str:
     """Close a task in Todoist (i.e., mark the task as complete)
 
     Args:
@@ -307,7 +448,8 @@ def todoist_close_task(ctx: Context, task_id: str) -> str:
             logger.warning(f"Error getting task with ID: {task_id}: {error}")
             return f"Could not verify task with ID: {task_id}. Task closing aborted."
 
-        is_success = todoist_client.close_task(task_id=task_id)
+        # Method name changed: close_task -> complete_task
+        is_success = todoist_client.complete_task(task_id=task_id)
 
         logger.info(f"Task closed successfully: {task_id}")
         return f"Successfully closed task: {task_content} (ID: {task_id})"
@@ -315,7 +457,7 @@ def todoist_close_task(ctx: Context, task_id: str) -> str:
         logger.error(f"Error closing task: {error}")
         return f"Error closing task: {str(error)}"
 
-def todoist_reopen_task(ctx: Context, task_id: str) -> str:
+def todoist_uncomplete_task(ctx: Context, task_id: str) -> str:
     """Reopen a task in Todoist (i.e., mark the task as incomplete)
 
     Args:
@@ -334,13 +476,70 @@ def todoist_reopen_task(ctx: Context, task_id: str) -> str:
             logger.warning(f"Error getting task with ID: {task_id}: {error}")
             return f"Could not verify task with ID: {task_id}. Task reopening aborted."
 
-        is_success = todoist_client.reopen_task(task_id=task_id)
+        # Method name changed: reopen_task -> uncomplete_task
+        is_success = todoist_client.uncomplete_task(task_id=task_id)
 
         logger.info(f"Task reopened successfully: {task_id}")
         return f"Successfully reopened task: {task_content} (ID: {task_id})"
     except Exception as error:
         logger.error(f"Error reopening task: {error}")
         return f"Error reopening task: {str(error)}"
+
+def todoist_move_task(
+    ctx: Context,
+    task_id: str,
+    parent_id: Optional[str] = None,
+    section_id: Optional[str] = None,
+    project_id: Optional[str] = None
+) -> str:
+    """Move a task to a different location
+
+    Args:
+        task_id: ID of the task to move
+        parent_id: ID of the destination parent task (optional)
+        section_id: ID of the destination section (optional)
+        project_id: ID of the destination project (optional)
+
+    Note: Only one of parent_id, section_id or project_id must be set.
+    """
+    todoist_client = ctx.request_context.lifespan_context.todoist_client
+
+    try:
+        logger.info(f"Moving task with ID: {task_id}")
+
+        # Verify the task exists first
+        try:
+            task = todoist_client.get_task(task_id=task_id)
+            task_content = task.content
+        except Exception as error:
+            logger.warning(f"Error getting task with ID: {task_id}: {error}")
+            return f"Could not verify task with ID: {task_id}. Task move aborted."
+
+        # Count how many destination parameters are set
+        destination_count = sum(1 for x in [parent_id, section_id, project_id] if x is not None)
+
+        if destination_count != 1:
+            return "Error: Exactly one of parent_id, section_id, or project_id must be specified"
+
+        # Use the new native move_task method - much simpler than sync API!
+        is_success = todoist_client.move_task(
+            task_id=task_id,
+            parent_id=parent_id,
+            section_id=section_id,
+            project_id=project_id
+        )
+
+        if is_success:
+            logger.info(f"Task moved successfully: {task_id}")
+            return f"Successfully moved task: {task_content} (ID: {task_id})"
+        else:
+            error_msg = "Failed to move task"
+            logger.error(error_msg)
+            return error_msg
+
+    except Exception as error:
+        logger.error(f"Error moving task: {error}")
+        return f"Error moving task: {str(error)}"
 
 def todoist_delete_task(ctx: Context, task_id: str) -> str:
     """Delete a task from Todoist

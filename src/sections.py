@@ -17,20 +17,22 @@ def todoist_get_sections(ctx: Context, project_id: Optional[str] = None) -> str:
     try:
         logger.info(f"Getting sections{' for project ID: ' + project_id if project_id else ''}")
 
-        # Create parameters dictionary
-        params = {}
-        if project_id:
-            params["project_id"] = project_id
+        # New API returns Iterator[list[Section]] - we need to iterate through pages
+        sections_iterator = todoist_client.get_sections(project_id=project_id)
+        all_sections = []
 
-        # Get sections
-        sections = todoist_client.get_sections(**params)
+        for section_batch in sections_iterator:
+            all_sections.extend(section_batch)
+            # If we got less than the limit, this is the last page
+            if len(section_batch) < 200:  # API default limit
+                break
 
-        if not sections:
+        if not all_sections:
             logger.info("No sections found")
             return "No sections found" + (f" in project ID: {project_id}" if project_id else "")
 
-        logger.info(f"Retrieved {len(sections)} sections")
-        return sections
+        logger.info(f"Retrieved {len(all_sections)} sections")
+        return all_sections
     except Exception as error:
         logger.error(f"Error getting sections: {error}")
         return f"Error getting sections: {str(error)}"
