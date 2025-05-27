@@ -1,8 +1,18 @@
 # Todoist MCP Server (Python)
 
+[![smithery badge](https://smithery.ai/badge/@mikemc/todoist-mcp-server)](https://smithery.ai/server/@mikemc/todoist-mcp-server)
+
 A Todoist MCP server written in Python, using the [Todoist Python API](https://developer.todoist.com/rest/v2/?python). I first created the server by using Claude to translate this [TypeScript Todoist MCP server](https://github.com/abhiz123/todoist-mcp-server) to Python. I'm gradually changing and adding functionality to suit my workflow as I experiment with using Claude to help with task management.
 
 ## Installation
+
+### Installing via Smithery
+
+To install Todoist Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@mikemc/todoist-mcp-server):
+
+```bash
+npx -y @smithery/cli install @mikemc/todoist-mcp-server --client claude
+```
 
 ### Prerequisites
 
