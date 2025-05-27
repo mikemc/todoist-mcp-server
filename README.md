@@ -58,6 +58,88 @@ Or, to run from a local copy,
 }
 ```
 
+### Configuration with Local LLM and Goose
+
+For a more privacy preserving AI todo-list experience, you can run a local LLM using [LM Studio](https://lmstudio.ai/) or [Ollama](https://ollama.com/), and then point [Codename Goose](https://block.github.io/goose/) to use that LLM, and then configure it to run this MCP as a tool.
+
+Configure the LLM you want Goose to use: 
+
+`$ goose configure`
+
+This command will ask you whether you want to use a local model or a cloud hosted model. Ensure your model provider is running your model first. Specify the address of the model API, and the model name. Many locally deployed LLMs use a format compatible with `Ollama`, so for both `LM Studio` or `Ollama` LLMs, select `Ollama`.
+
+```bash
+◇  Which model provider should we use?
+│  Ollama 
+│
+◇  Provider Ollama requires OLLAMA_HOST, please enter a value
+│  localhost:1234
+│
+◇  Model fetch complete
+│
+◇  Enter a model from that provider:
+│  phi-4
+```
+
+Then run the same command again to configure the Todoist MCP: 
+
+`$ goose configure`
+
+This time it will ask about extensions:
+
+```bash
+◇  What would you like to configure?
+│  Add Extension 
+│
+◇  What type of extension would you like to add?
+│  Command-line Extension 
+│
+◇  What would you like to call this extension?
+│  todoist
+│
+◇  What command should be run?
+│  uvx git+https://github.com/mikemc/todoist-mcp-server
+│
+◇  Please set the timeout for this tool (in secs):
+│  60
+│
+◇  Would you like to add a description?
+│  No 
+│
+◇  Would you like to add environment variables?
+│  Yes 
+│
+◇  Environment variable name:
+│  TODOIST_API_TOKEN
+│
+◇  Environment variable value:
+│  ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪
+│
+◇  Add another environment variable?
+│  No 
+│
+└  Added todoist extension
+```
+
+Now you can run `goose` and ask it questions about your todo list, or make changes.
+```bash
+$ goose          
+starting session | provider: ollama model: phi-4
+    logging to ******
+    working directory: ******
+
+Goose is running! Enter your instructions, or try asking what goose can do.
+
+( O)> how many todo list tasks have I completed in the last 7 days
+
+─── todoist_get_tasks | todoist ──────────────────────────
+filter: last 7 days completed
+
+...
+*Ideally* You have been very busy this week. You have completed 15 tasks! Listed below are the tasks.
+...
+```
+
 ## Available Tools
 
 To see currently available tools, run
