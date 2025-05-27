@@ -35,6 +35,14 @@ from .tasks import (
     todoist_delete_task,
 )
 
+from .comments import (
+    todoist_get_comment,
+    todoist_get_comments,
+    todoist_add_comment,
+    todoist_update_comment,
+    todoist_delete_comment,
+)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -82,6 +90,12 @@ mcp.tool()(todoist_complete_task)
 mcp.tool()(todoist_uncomplete_task)
 mcp.tool()(todoist_move_task)
 mcp.tool()(todoist_delete_task)
+
+mcp.tool()(todoist_get_comment)
+mcp.tool()(todoist_get_comments)
+mcp.tool()(todoist_add_comment)
+mcp.tool()(todoist_update_comment)
+mcp.tool()(todoist_delete_comment)
 
 def main():
     logger.info("Starting Todoist MCP Server")

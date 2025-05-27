@@ -91,6 +91,12 @@ As of 2025-05-26,
   - `todoist_uncomplete_task`
   - `todoist_move_task`
   - `todoist_delete_task`
+- Comments
+  - `todoist_get_comment`
+  - `todoist_get_comments`
+  - `todoist_add_comment`
+  - `todoist_update_comment`
+  - `todoist_delete_comment`
 
 ## License
 
