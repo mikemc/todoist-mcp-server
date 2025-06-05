@@ -58,9 +58,9 @@ Or, to run from a local copy,
 }
 ```
 
-### Configuration with Local LLM and Goose
+### Configuration with Goose (and a local LLM)
 
-For a more privacy preserving AI todo-list experience, you can run a local LLM using [LM Studio](https://lmstudio.ai/) or [Ollama](https://ollama.com/), and then point [Codename Goose](https://block.github.io/goose/) to use that LLM, and then configure it to run this MCP as a tool.
+You can use [Goose](https://block.github.io/goose/) and a local LLM provider: [LM Studio](https://lmstudio.ai/) or [Ollama](https://ollama.com/).
 
 Configure the LLM you want Goose to use: 
 
