@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
+import json
 from typing import Optional
 from mcp.server.fastmcp import Context
 
@@ -24,7 +25,7 @@ def todoist_get_comment(ctx: Context, comment_id: str) -> str:
             return f"No comment found with ID: {comment_id}"
 
         logger.info(f"Retrieved comment: {comment.id}")
-        return comment
+        return json.dumps(comment.to_dict(), indent=2, default=str)
     except Exception as error:
         logger.error(f"Error getting comment: {error}")
         return f"Error getting comment: {str(error)}"
@@ -114,7 +115,7 @@ def todoist_get_comments(
         elif len(all_comments) == nmax:
             logger.info(f"Retrieved exactly the requested {nmax} comments")
 
-        return all_comments
+        return json.dumps([comment.to_dict() for comment in all_comments], indent=2, default=str)
 
     except Exception as error:
         logger.error(f"Error getting comments: {error}")
@@ -157,7 +158,7 @@ def todoist_add_comment(
         comment = todoist_client.add_comment(**comment_params)
 
         logger.info(f"Comment created successfully: {comment.id}")
-        return comment
+        return json.dumps(comment.to_dict(), indent=2, default=str)
     except Exception as error:
         logger.error(f"Error creating comment: {error}")
         return f"Error creating comment: {str(error)}"
@@ -174,18 +175,10 @@ def todoist_update_comment(ctx: Context, comment_id: str, content: str) -> str:
     try:
         logger.info(f"Updating comment with ID: {comment_id}")
 
-        try:
-            comment = todoist_client.get_comment(comment_id=comment_id)
-            original_content = comment.content[:50] + "..." if len(comment.content) > 50 else comment.content
-        except Exception as error:
-            logger.warning(f"Error getting comment with ID: {comment_id}: {error}")
-            return f"Could not verify comment with ID: {comment_id}. Update aborted."
-
         updated_comment = todoist_client.update_comment(comment_id=comment_id, content=content)
 
         logger.info(f"Comment updated successfully: {comment_id}")
-        response = f"Successfully updated comment from '{original_content}' (ID: {comment_id})"
-        return response, updated_comment
+        return json.dumps(updated_comment.to_dict(), indent=2, default=str)
 
     except Exception as error:
         logger.error(f"Error updating comment: {error}")

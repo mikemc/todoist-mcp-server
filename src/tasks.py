@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
+import json
 from typing import Optional, Dict, Any
 from mcp.server.fastmcp import Context
 
@@ -112,7 +113,7 @@ def todoist_add_task(
         task = todoist_client.add_task(**task_params)
 
         logger.info(f"Task created successfully: {task.id}")
-        return task
+        return json.dumps(task.to_dict(), indent=2, default=str)
     except Exception as error:
         logger.error(f"Error creating task: {error}")
         return f"Error creating task: {str(error)}"
@@ -232,7 +233,7 @@ def todoist_get_tasks(
         elif len(all_tasks) == nmax:
             logger.info(f"Retrieved exactly the requested {nmax} tasks")
 
-        return all_tasks
+        return json.dumps([task.to_dict() for task in all_tasks], indent=2, default=str)
 
     except Exception as error:
         logger.error(f"Error getting tasks: {error}")
@@ -319,7 +320,7 @@ def todoist_filter_tasks(
         elif len(all_tasks) == nmax:
             logger.info(f"Retrieved exactly the requested {nmax} tasks")
 
-        return all_tasks
+        return json.dumps([task.to_dict() for task in all_tasks], indent=2, default=str)
 
     except Exception as error:
         logger.error(f"Error filtering tasks: {error}")
@@ -343,7 +344,7 @@ def todoist_get_task(ctx: Context, task_id: str) -> str:
             return f"No task found with ID: {task_id}"
 
         logger.info(f"Retrieved task: {task.id}")
-        return task
+        return json.dumps(task.to_dict(), indent=2, default=str)
     except Exception as error:
         logger.error(f"Error getting task: {error}")
         return f"Error getting task: {str(error)}"
@@ -453,9 +454,7 @@ def todoist_update_task(
         updated_task = todoist_client.update_task(task_id, **update_data)
 
         logger.info(f"Task updated successfully: {task_id}")
-
-        response = f"Successfully updated task: {original_content} (ID: {task_id})"
-        return response, updated_task
+        return json.dumps(updated_task.to_dict(), indent=2, default=str)
     except Exception as error:
         logger.error(f"Error updating task: {error}")
         return f"Error updating task: {str(error)}"

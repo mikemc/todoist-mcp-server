@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
+import json
 from typing import Optional
 from mcp.server.fastmcp import Context
 
@@ -31,7 +32,7 @@ def todoist_get_sections(ctx: Context, project_id: Optional[str] = None) -> str:
             return "No sections found" + (f" in project ID: {project_id}" if project_id else "")
 
         logger.info(f"Retrieved {len(all_sections)} sections")
-        return all_sections
+        return json.dumps([section.to_dict() for section in all_sections], indent=2, default=str)
     except Exception as error:
         logger.error(f"Error getting sections: {error}")
         return f"Error getting sections: {str(error)}"
@@ -54,7 +55,7 @@ def todoist_get_section(ctx: Context, section_id: str) -> str:
             return f"No section found with ID: {section_id}"
 
         logger.info(f"Retrieved section: {section.id}")
-        return section
+        return json.dumps(section.to_dict(), indent=2, default=str)
     except Exception as error:
         logger.error(f"Error getting section: {error}")
         return f"Error getting section: {str(error)}"
@@ -88,7 +89,7 @@ def todoist_add_section(
         section = todoist_client.add_section(**section_params)
 
         logger.info(f"Section created successfully: {section.id}")
-        return section
+        return json.dumps(section.to_dict(), indent=2, default=str)
     except Exception as error:
         logger.error(f"Error creating section: {error}")
         return f"Error creating section: {str(error)}"
@@ -116,8 +117,7 @@ def todoist_update_section(ctx: Context, section_id: str, name: str) -> str:
         updated_section = todoist_client.update_section(section_id=section_id, name=name)
 
         logger.info(f"Section updated successfully: {section_id}")
-        response = f"Successfully updated section from '{original_name}' to '{name}' (ID: {section_id})"
-        return response, updated_section
+        return json.dumps(updated_section.to_dict(), indent=2, default=str)
 
     except Exception as error:
         logger.error(f"Error updating section: {error}")

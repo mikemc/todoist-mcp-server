@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
+import json
 from typing import Optional
 from mcp.server.fastmcp import Context
 
@@ -29,7 +30,7 @@ def todoist_get_projects(ctx: Context) -> str:
             return "No projects found in your Todoist account"
 
         logger.info(f"Retrieved {len(all_projects)} projects")
-        return all_projects
+        return json.dumps([project.to_dict() for project in all_projects], indent=2, default=str)
     except Exception as error:
         logger.error(f"Error getting projects: {error}")
         return f"Error getting projects: {str(error)}"
@@ -52,7 +53,7 @@ def todoist_get_project(ctx: Context, project_id: str) -> str:
             return f"No project found with ID: {project_id}"
 
         logger.info(f"Retrieved project: {project.id}")
-        return project
+        return json.dumps(project.to_dict(), indent=2, default=str)
     except Exception as error:
         logger.error(f"Error getting project: {error}")
         return f"Error getting project: {str(error)}"
@@ -97,7 +98,7 @@ def todoist_add_project(
         project = todoist_client.add_project(**project_params)
 
         logger.info(f"Project created successfully: {project.id}")
-        return project
+        return json.dumps(project.to_dict(), indent=2, default=str)
     except Exception as error:
         logger.error(f"Error creating project: {error}")
         return f"Error creating project: {str(error)}"
@@ -149,8 +150,7 @@ def todoist_update_project(
         updated_project = todoist_client.update_project(project_id, **update_params)
 
         logger.info(f"Project updated successfully: {project_id}")
-        response = f"Successfully updated project: {original_name} (ID: {project_id})"
-        return response, updated_project
+        return json.dumps(updated_project.to_dict(), indent=2, default=str)
 
     except Exception as error:
         logger.error(f"Error updating project: {error}")
